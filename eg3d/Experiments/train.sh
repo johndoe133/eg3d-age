@@ -4,7 +4,7 @@ module load cuda/11.1
 
 node_ip="$(ifconfig | grep "inet" | awk 'NR==1{print $2}')"
 
-export CUDA_VISIBLE_DEVICES=0,1,2,3
+export CUDA_VISIBLE_DEVICES=0,1
 
 python -m debugpy \
     --listen $node_ip:1222 train.py \
@@ -12,7 +12,7 @@ python -m debugpy \
     --cfg=ffhq \
     --data=./datasets/FFHQ_512 \
     --gpus=4 \
-    --batch=32 \
+    --batch=16 \
     --gamma=5 \
     --gen_pose_cond=True \
     --resume=networks/ffhqrebalanced512-64.pkl \
