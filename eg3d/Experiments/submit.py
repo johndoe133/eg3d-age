@@ -15,6 +15,7 @@ parser.add_argument("--logs_dir", help="",default = 'out')
 parser.add_argument("--batch_size", help="",default = 64, type=int)
 parser.add_argument("--gamma", help="",default = 5)
 parser.add_argument("--resume", help="",default = None)
+parser.add_argument("--devices", help="",default = None)
 
 args = parser.parse_args()
 
@@ -33,6 +34,15 @@ else:
     if args.gpu_num > 2:
         raise Exception(f'gpu_num cannot exceed 2 for {args.queue_name} queue')
 
+if not args.devices:
+    args.devices = ''
+    for i in range(args.gpu_num):
+        args.devices += f'{i},'
+    args.devics = args.devices[:-1]
+
+if len(args.devices.split(',')) != args.gpu_num:
+    raise Exception('Number of cuda visible devices must be equal to number of gpus specified')
+
 submit_script = template_text.format(
                     **{
                         "queue_name": args.queue_name, 
@@ -42,6 +52,7 @@ submit_script = template_text.format(
                         "logs_dir": args.logs_dir, 
                         "batch_size": args.batch_size, 
                         "gamma": args.gamma, 
+                        "devices": args.devices,
                     }
                 )
 

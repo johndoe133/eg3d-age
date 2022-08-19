@@ -1,6 +1,7 @@
 template_text = """
 #!/bin/sh
 ### General options
+export CUDA_VISIBLE_DEVICES={devices}
 
 ### -- specify queue --
 #BSUB -q {queue_name}
