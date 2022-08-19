@@ -29,3 +29,5 @@ eg3d/datasets
 eg3d/out
 notes.txt
 eg3d/training-runs
+
+eg3d/networks/*
