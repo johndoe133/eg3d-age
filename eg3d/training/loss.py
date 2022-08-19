@@ -16,7 +16,7 @@ from torch_utils import training_stats
 from torch_utils.ops import conv2d_gradfix
 from torch_utils.ops import upfirdn2d
 from training.dual_discriminator import filtered_resizing
-
+from training.age_estimation import AgeEstimator
 #----------------------------------------------------------------------------
 
 class Loss:
@@ -52,7 +52,14 @@ class StyleGAN2Loss(Loss):
         self.filter_mode = filter_mode
         self.resample_filter = upfirdn2d.setup_filter([1,3,3,1], device=device)
         self.blur_raw_target = True
+        self.age_model = AgeEstimator(device='gpu')
         assert self.gpc_reg_prob is None or (0 <= self.gpc_reg_prob <= 1)
+
+    def run_age_loss(self, imgs, ages):
+        pred_ages = self.age_model.estimate(imgs)
+        ages = ages.cpu().detach().numpy()
+        return torch.mean(torch.abs(torch.tensor(pred_ages - ages)))
+
 
     def run_G(self, z, c, swapping_prob, neural_rendering_resolution, update_emas=False):
         if swapping_prob is not None:
@@ -120,12 +127,13 @@ class StyleGAN2Loss(Loss):
             with torch.autograd.profiler.record_function('Gmain_forward'):
                 gen_img, _gen_ws = self.run_G(gen_z, gen_c, swapping_prob=swapping_prob, neural_rendering_resolution=neural_rendering_resolution)
                 gen_logits = self.run_D(gen_img, gen_c, blur_sigma=blur_sigma)
+                age_loss = self.run_age_loss(gen_img['image'], gen_c[:, -1])
                 training_stats.report('Loss/scores/fake', gen_logits)
                 training_stats.report('Loss/signs/fake', gen_logits.sign())
                 loss_Gmain = torch.nn.functional.softplus(-gen_logits)
                 training_stats.report('Loss/G/loss', loss_Gmain)
             with torch.autograd.profiler.record_function('Gmain_backward'):
-                loss_Gmain.mean().mul(gain).backward()
+                torch.add(loss_Gmain.mean(),age_loss).mul(gain).backward()
 
         # Density Regularization
         if phase in ['Greg', 'Gboth'] and self.G.rendering_kwargs.get('density_reg', 0) > 0 and self.G.rendering_kwargs['reg_type'] == 'l1':
