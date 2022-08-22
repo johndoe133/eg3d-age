@@ -17,6 +17,7 @@ import json
 import pickle
 import psutil
 import PIL.Image
+from PIL import ImageDraw, ImageFont
 import numpy as np
 import torch
 import dnnlib
@@ -72,7 +73,7 @@ def setup_snapshot_image_grid(training_set, random_seed=0):
 
 #----------------------------------------------------------------------------
 
-def save_image_grid(img, fname, drange, grid_size):
+def save_image_grid(img, fname, drange, grid_size, ages=None):
     lo, hi = drange
     img = np.asarray(img, dtype=np.float32)
     img = (img - lo) * (255 / (hi - lo))
@@ -82,13 +83,31 @@ def save_image_grid(img, fname, drange, grid_size):
     _N, C, H, W = img.shape
     img = img.reshape([gh, gw, C, H, W])
     img = img.transpose(0, 3, 1, 4, 2)
-    img = img.reshape([gh * H, gw * W, C])
+    img = img.reshape([gh * H, gw * W, C]) # 15 pics wide, 8 tall
+
+    font = ImageFont.truetype("FreeSerif.ttf", 64)
 
     assert C in [1, 3]
     if C == 1:
-        PIL.Image.fromarray(img[:, :, 0], 'L').save(fname)
+        img_grid = PIL.Image.fromarray(img[:, :, 0], 'L')
+        text_added = ImageDraw.Draw(img_grid)
+        if ages:
+            counter = 0
+            for r in range(8):
+                for c in range(15):
+                    text_added.text((c*512,r*512),str(ages[counter]), font=font) # untested
+                    counter += 1
+            img_grid.save(fname)
     if C == 3:
-        PIL.Image.fromarray(img, 'RGB').save(fname)
+        img_grid = PIL.Image.fromarray(img, 'RGB')
+        text_added = ImageDraw.Draw(img_grid)
+        if ages:
+            counter = 0
+            for r in range(8):
+                for c in range(15):
+                    text_added.text((c*512,r*512),str(ages[counter]), font=font) # untested
+                    counter += 1
+            img_grid.save(fname)
 
 #----------------------------------------------------------------------------
 
@@ -362,9 +381,12 @@ def training_loop(
             images = torch.cat([o['image'].cpu() for o in out]).numpy()
             images_raw = torch.cat([o['image_raw'].cpu() for o in out]).numpy()
             images_depth = -torch.cat([o['image_depth'].cpu() for o in out]).numpy()
-            save_image_grid(images, os.path.join(run_dir, f'fakes{cur_nimg//1000:06d}.png'), drange=[-1,1], grid_size=grid_size)
-            save_image_grid(images_raw, os.path.join(run_dir, f'fakes{cur_nimg//1000:06d}_raw.png'), drange=[-1,1], grid_size=grid_size)
-            save_image_grid(images_depth, os.path.join(run_dir, f'fakes{cur_nimg//1000:06d}_depth.png'), drange=[images_depth.min(), images_depth.max()], grid_size=grid_size)
+            ages = []
+            for c in grid_c:
+                ages += (list(c[:,25].cpu().detach().numpy()))
+            save_image_grid(images, os.path.join(run_dir, f'fakes{cur_nimg//1000:06d}.png'), drange=[-1,1], grid_size=grid_size, ages=ages)
+            save_image_grid(images_raw, os.path.join(run_dir, f'fakes{cur_nimg//1000:06d}_raw.png'), drange=[-1,1], grid_size=grid_size, ages=ages)
+            save_image_grid(images_depth, os.path.join(run_dir, f'fakes{cur_nimg//1000:06d}_depth.png'), drange=[images_depth.min(), images_depth.max()], grid_size=grid_size, ages=ages)
 
             #--------------------
             # # Log forward-conditioned images
