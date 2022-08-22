@@ -133,7 +133,8 @@ class StyleGAN2Loss(Loss):
                 loss_Gmain = torch.nn.functional.softplus(-gen_logits)
                 training_stats.report('Loss/G/loss', loss_Gmain)
             with torch.autograd.profiler.record_function('Gmain_backward'):
-                torch.add(loss_Gmain.mean(),age_loss).mul(gain).backward()
+                (loss_Gmain.mean() + age_loss).mul(gain).backward() # added age loss
+                # torch.add(loss_Gmain.mean(),age_loss).mul(gain).backward()
 
         # Density Regularization
         if phase in ['Greg', 'Gboth'] and self.G.rendering_kwargs.get('density_reg', 0) > 0 and self.G.rendering_kwargs['reg_type'] == 'l1':
