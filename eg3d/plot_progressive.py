@@ -66,11 +66,10 @@ def generate_images(
 
         for age in [5,10,20,30,40,50,60,70]:
             cuda0 = torch.device('cuda:0')
-            print(conditioning_params.shape)
-            print(torch.tensor([age], device=cuda0).shape)
             c = torch.cat((conditioning_params, torch.tensor([[age]], device=cuda0)), 1)
+            c_params = torch.cat((camera_params, torch.tensor([[age]], device=cuda0)), 1)
             ws = G.mapping(z, c, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff)
-            img = G.synthesis(ws, camera_params)['image']
+            img = G.synthesis(ws, c_params)['image']
 
             img = (img.permute(0, 2, 3, 1) * 127.5 + 128).clamp(0, 255).to(torch.uint8)
             imgs.append(img)
