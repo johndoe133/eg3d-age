@@ -111,6 +111,24 @@ def save_image_grid(img, fname, drange, grid_size, ages=None):
 
 #----------------------------------------------------------------------------
 
+def generate_age(minimum, maximum, distribution = "uniform"):
+    """Generates an age between a min and max.
+
+    Args:
+        minimum (int): minim age
+        maximum (int): max age
+        distribution (str, optional): distribution drawn from. Defaults to "uniform".
+
+    Returns:
+        np.array size 1: generated age 
+    """
+    if distribution == "uniform":
+        return np.random.random_integers(minimum, maximum, size=1)
+    elif distribution == "triangular":
+        return np.random.triangular(minimum, minimum + (maximum-minimum) // 2, size = 1)
+
+#----------------------------------------------------------------------------
+
 def training_loop(
     run_dir                 = '.',      # Output directory.
     training_set_kwargs     = {},       # Options for training set.
@@ -286,6 +304,8 @@ def training_loop(
             all_gen_z = torch.randn([len(phases) * batch_size, G.z_dim], device=device)
             all_gen_z = [phase_gen_z.split(batch_gpu) for phase_gen_z in all_gen_z.split(batch_size)]
             all_gen_c = [training_set.get_label(np.random.randint(len(training_set))) for _ in range(len(phases) * batch_size)]
+            # replace age sampled from dataset.json with generated age between range
+            all_gen_c = [np.concatenate([gen_c_initial[:-1] + generate_age(5, 75)]) for gen_c_initial in all_gen_c]
             all_gen_c = torch.from_numpy(np.stack(all_gen_c)).pin_memory().to(device)
             all_gen_c = [phase_gen_c.split(batch_gpu) for phase_gen_c in all_gen_c.split(batch_size)]
 
