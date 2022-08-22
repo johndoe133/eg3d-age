@@ -29,6 +29,7 @@ class AgeEstimator():
             np.array: resized images
         """
         return np.array([cv2.resize(img, self.age_model_input_shape) for img in images])
+    
     def convert_images(self, images):
         """Converts normal distributed tensor 3x512x512 to a 0-255 512x512x3 numpy array
 
