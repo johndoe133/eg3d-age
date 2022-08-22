@@ -12,10 +12,10 @@ parser.add_argument("--job_name", help="Give job name",default = 'eg3d')
 parser.add_argument("--gpu_num", help="",default = 2, type=int)
 parser.add_argument("--gpu_mem", help="",default = 40, type=int)
 parser.add_argument("--logs_dir", help="",default = 'out')
-parser.add_argument("--batch_size", help="",default = 64, type=int)
+parser.add_argument("--batch_size", help="",default = 8, type=int)
 parser.add_argument("--gamma", help="",default = 5)
 parser.add_argument("--resume", help="",default = None)
-parser.add_argument("--devices", help="",default = None)
+parser.add_argument("--devices", help="",default = '0,1')
 
 args = parser.parse_args()
 
