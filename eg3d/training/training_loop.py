@@ -285,7 +285,7 @@ def training_loop(
             all_gen_z = torch.randn([len(phases) * batch_size, G.z_dim], device=device)
             all_gen_z = [phase_gen_z.split(batch_gpu) for phase_gen_z in all_gen_z.split(batch_size)]
             all_gen_c = [training_set.get_label(np.random.randint(len(training_set))) for _ in range(len(phases) * batch_size)]
-            # replace age sampled from dataset.json with generated age b
+            # replace age sampled from dataset.json with generated age between range
             all_gen_c = [np.concatenate([gen_c_initial[:-1] + generate_age(5, 75)]) for gen_c_initial in all_gen_c]
             all_gen_c = torch.from_numpy(np.stack(all_gen_c)).pin_memory().to(device)
             all_gen_c = [phase_gen_c.split(batch_gpu) for phase_gen_c in all_gen_c.split(batch_size)]
