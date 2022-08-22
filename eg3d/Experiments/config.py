@@ -43,5 +43,4 @@ source activate eg3d
 module load gcc/9.2.0
 module load cuda/11.1
 
-python train.py --outdir=./training-runs --cfg=ffhq --data=./datasets/FFHQ_128 --gpus={gpu_num} --batch={batch_size} --gamma={gamma} --gen_pose_cond=True 
-"""
+python train.py --outdir=./training-runs --cfg=ffhq --data={data} --gpus={gpu_num} --batch={batch_size} --gamma={gamma} --gen_pose_cond=True"""

@@ -16,6 +16,7 @@ parser.add_argument("--batch_size", help="",default = 8, type=int)
 parser.add_argument("--gamma", help="",default = 5)
 parser.add_argument("--resume", help="",default = None)
 parser.add_argument("--devices", help="",default = '0,1')
+parser.add_argument("--data", help="",default = 'datasets/FFHQ_128')
 
 args = parser.parse_args()
 
@@ -43,6 +44,9 @@ if not args.devices:
 if len(args.devices.split(',')) != args.gpu_num:
     raise Exception('Number of cuda visible devices must be equal to number of gpus specified')
 
+if args.data == 'datasets/FFHQ_128' and args.resume:
+    args.data = 'datasets/FFHQ_512'
+
 submit_script = template_text.format(
                     **{
                         "queue_name": args.queue_name, 
@@ -53,11 +57,13 @@ submit_script = template_text.format(
                         "batch_size": args.batch_size, 
                         "gamma": args.gamma, 
                         "devices": args.devices,
+                        "data": args.data,
                     }
                 )
 
 if args.resume:
-    submit_script += f" \ \n--resume={args.resume}"
+    submit_script += f" --resume={args.resume}"
+    
 
 submit_file = args.logs_dir / "submit.sh"
 
