@@ -55,11 +55,24 @@ class StyleGAN2Loss(Loss):
         self.age_model = AgeEstimator(device='gpu')
         assert self.gpc_reg_prob is None or (0 <= self.gpc_reg_prob <= 1)
 
-    def run_age_loss(self, imgs, ages):
+    def run_age_loss(self, imgs, ages, error_function = "MSE"):
+        """Returns the age loss given a series of generated images and the age the synthetic images
+        are suppose to resemble.
+
+        Args:
+            imgs (tensor): tensor of images 
+            ages (tensor): tensor of ages
+            error_function (str, optional): The error function used. Defaults to "MSE". MSE and MAE available.
+
+        Returns:
+            tensor: age loss
+        """
         pred_ages = self.age_model.estimate(imgs)
         ages = ages.cpu().detach().numpy()
-        return torch.mean(torch.abs(torch.tensor(pred_ages - ages)))
-
+        if error_function == "MSE":
+            return torch.mean(torch.square(torch.tensor(pred_ages - ages)))
+        elif error_function == "MAE":
+            return torch.mean(torch.abs(torch.tensor(pred_ages - ages)))
 
     def run_G(self, z, c, swapping_prob, neural_rendering_resolution, update_emas=False):
         if swapping_prob is not None:
