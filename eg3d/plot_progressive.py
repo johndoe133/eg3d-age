@@ -55,7 +55,7 @@ def generate_images(
     imgs = []
 
     angle_p = -0.2
-
+    ages = [5,10,20,30,40,50,60,70]
     for angle_y, angle_p in [(.4, angle_p), (0, angle_p), (-.4, angle_p)]:
         cam_pivot = torch.tensor(G.rendering_kwargs.get('avg_camera_pivot', [0, 0, 0]), device=device)
         cam_radius = G.rendering_kwargs.get('avg_camera_radius', 2.7)
@@ -64,7 +64,8 @@ def generate_images(
         camera_params = torch.cat([cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)
         conditioning_params = torch.cat([conditioning_cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)
 
-        for age in [5,10,20,30,40,50,60,70]:
+        
+        for age in ages:
             cuda0 = torch.device('cuda:0')
             c = torch.cat((conditioning_params, torch.tensor([[age]], device=cuda0)), 1)
             c_params = torch.cat((camera_params, torch.tensor([[age]], device=cuda0)), 1)
@@ -73,9 +74,16 @@ def generate_images(
 
             img = (img.permute(0, 2, 3, 1) * 127.5 + 128).clamp(0, 255).to(torch.uint8)
             imgs.append(img)
-
+    angles = 3
+    no_ages = len(ages)
     img = torch.cat(imgs, dim=2)
-    PIL.Image.fromarray(img[0].cpu().numpy(), 'RGB').save(f'{outdir}/seed{seed:04d}.png')
+    #t = torch.zeros((128*angles, 128*no_ages, 3))
+    img_h=128
+    img_stack=[]
+    for i in range(angles):
+        img_stack.append(img[0][:, i*img_h*no_ages: (i+1)*img_h*no_ages,:])
+    t = torch.cat(img_stack)
+    PIL.Image.fromarray(t.cpu().numpy(), 'RGB').save(f'{outdir}/seed{seed:04d}.png')
     print(f'saved at {outdir}/seed{seed:04d}.png')
 
 if __name__ == "__main__":
