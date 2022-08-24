@@ -13,7 +13,7 @@ export CUDA_VISIBLE_DEVICES={devices}
 #BSUB -n 8
 
 ### -- Select the resources: {gpu_num} gpus -- 
-#BSUB -gpu "num={gpu_num}"
+#BSUB -gpu "num={gpu_num}:mode=exclusive_process"
 
 ### -- set walltime limit: hh:mm --  maximum 24 hours for GPU-queues right now
 #BSUB -W 24:00
