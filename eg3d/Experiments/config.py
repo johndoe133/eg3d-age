@@ -13,7 +13,7 @@ export CUDA_VISIBLE_DEVICES={devices}
 #BSUB -n 8
 
 ### -- Select the resources: {gpu_num} gpus -- 
-#BSUB -gpu "num={gpu_num}"
+#BSUB -gpu "num={gpu_num}:mode=exclusive_process"
 
 ### -- set walltime limit: hh:mm --  maximum 24 hours for GPU-queues right now
 #BSUB -W 24:00
@@ -43,4 +43,4 @@ source activate eg3d
 module load gcc/9.2.0
 module load cuda/11.1
 
-python train.py --outdir=./training-runs --cfg=ffhq --data={data} --gpus={gpu_num} --batch={batch_size} --gamma={gamma} --gen_pose_cond=True"""
+python train.py --outdir=./training-runs --cfg=ffhq --data={data} --gpus={gpu_num} --batch={batch_size} --gamma={gamma} --gen_pose_cond=True --age_scale={age_scale}"""
