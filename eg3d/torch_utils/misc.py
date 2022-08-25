@@ -161,9 +161,9 @@ def copy_params_and_buffers(src_module, dst_module, require_all=False):
     for name, tensor in named_params_and_buffers(dst_module):
         assert (name in src_tensors) or (not require_all)
         if name in src_tensors:
-            if name == 'backbone.mapping.embed.weight' or name == 'mapping.embed.weight':
+            if (name == 'backbone.mapping.embed.weight' or name == 'mapping.embed.weight') and src_tensors[name].shape[-1] == 25:
                 src_tensors[name] = torch.nn.Parameter(torch.nn.functional.pad(input = src_tensors[name], pad=(0,1,0,0), mode='constant', value=0))
-            elif name == 'dataset_label_std':
+            elif name == 'dataset_label_std' and src_tensors[name].shape[-1] == 25:
                 src_tensors[name] = torch.cat((src_tensors[name], torch.zeros(1)))
             
             tensor.copy_(src_tensors[name].detach()).requires_grad_(tensor.requires_grad)
