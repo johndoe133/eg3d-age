@@ -140,7 +140,7 @@ class StyleGAN2Loss(Loss):
             with torch.autograd.profiler.record_function('Gmain_forward'):
                 gen_img, _gen_ws = self.run_G(gen_z, gen_c, swapping_prob=swapping_prob, neural_rendering_resolution=neural_rendering_resolution)
                 gen_logits = self.run_D(gen_img, gen_c, blur_sigma=blur_sigma)
-                age_loss = self.run_age_loss(gen_img['image'], gen_c[:, -1])
+                age_loss = self.run_age_loss(gen_img['image'], gen_c[:, -1], error_function="MSE")
                 training_stats.report('Loss/scores/fake', gen_logits)
                 training_stats.report('Loss/signs/fake', gen_logits.sign())
                 training_stats.report('Loss/scores/age', age_loss)
