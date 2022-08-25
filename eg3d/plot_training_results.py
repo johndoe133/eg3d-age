@@ -19,7 +19,6 @@ def generate_images(
     dpi: int,
     name: str
 ):
-    time.sleep(2)
     if not(outdir):
         outdir = training_run # save in same folder as training
     
