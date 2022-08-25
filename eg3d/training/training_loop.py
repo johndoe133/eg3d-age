@@ -85,7 +85,7 @@ def save_image_grid(img, fname, drange, grid_size, ages=None):
     img = img.transpose(0, 3, 1, 4, 2)
     img = img.reshape([gh * H, gw * W, C]) # 15 pics wide, 8 tall
 
-    font = ImageFont.truetype("FreeSerif.ttf", 64)
+    font = ImageFont.truetype("FreeSerif.ttf", 48)
 
     assert C in [1, 3]
     if C == 1:
@@ -93,9 +93,9 @@ def save_image_grid(img, fname, drange, grid_size, ages=None):
         text_added = ImageDraw.Draw(img_grid)
         if ages:
             counter = 0
-            for r in range(8):
-                for c in range(15):
-                    text_added.text((c*512,r*512),str(ages[counter]), font=font) # untested
+            for r in range(gh):
+                for c in range(gw):
+                    text_added.text((c*H,r*W),str(int(ages[counter])), font=font) # untested
                     counter += 1
             img_grid.save(fname)
     if C == 3:
@@ -103,9 +103,9 @@ def save_image_grid(img, fname, drange, grid_size, ages=None):
         text_added = ImageDraw.Draw(img_grid)
         if ages:
             counter = 0
-            for r in range(8):
-                for c in range(15):
-                    text_added.text((c*512,r*512),str(ages[counter]), font=font) # untested
+            for r in range(gh):
+                for c in range(gw):
+                    text_added.text((c*H,r*W),str(int(ages[counter])), font=font) # untested
                     counter += 1
             img_grid.save(fname)
 
@@ -123,9 +123,9 @@ def generate_age(minimum, maximum, distribution = "uniform"):
         np.array size 1: generated age 
     """
     if distribution == "uniform":
-        return np.random.random_integers(minimum, maximum, size=1)
+        return np.random.randint(minimum, maximum + 1, size=1) #.astype("float")
     elif distribution == "triangular":
-        return np.random.triangular(minimum, minimum + (maximum-minimum) // 2, size = 1)
+        return np.random.triangular(minimum, minimum + (maximum-minimum) // 2, size = 1) #.astype("float")
 
 #----------------------------------------------------------------------------
 
@@ -306,8 +306,9 @@ def training_loop(
             all_gen_z = [phase_gen_z.split(batch_gpu) for phase_gen_z in all_gen_z.split(batch_size)]
             all_gen_c = [training_set.get_label(np.random.randint(len(training_set))) for _ in range(len(phases) * batch_size)]
             # replace age sampled from dataset.json with generated age between range
-            # all_gen_c = [np.concatenate([gen_c_initial[:-1], generate_age(5, 75)]) for gen_c_initial in all_gen_c]
+            all_gen_c = [np.concatenate([gen_c_initial[:-1], generate_age(10, 70)]) for gen_c_initial in all_gen_c]
             all_gen_c = torch.from_numpy(np.stack(all_gen_c)).pin_memory().to(device)
+            all_gen_c = all_gen_c.float() # needed
             all_gen_c = [phase_gen_c.split(batch_gpu) for phase_gen_c in all_gen_c.split(batch_size)]
 
         # Execute training phases.
