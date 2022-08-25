@@ -30,5 +30,6 @@ eg3d/out
 notes.txt
 eg3d/training-runs
 
-eg3d/networks/age_model/*
-eg3d-age/eg3d/networks/pytorch-DEX/dex/pth/*
+*.pth
+*.prototxt
+*.caffemodel
