@@ -17,7 +17,8 @@ parser.add_argument("--gamma", help="",default = 5)
 parser.add_argument("--resume", help="",default = None)
 parser.add_argument("--devices", help="",default = '0,1')
 parser.add_argument("--data", help="",default = 'datasets/FFHQ_128')
-parser.add_argument("--age_scale", help="",default = '1')
+parser.add_argument("--age_scale", help="",default = '0.1')
+parser.add_argument("--age_loss_fn", help="", default="MSE")
 
 args = parser.parse_args()
 
@@ -60,6 +61,7 @@ submit_script = template_text.format(
                         "devices": args.devices,
                         "data": args.data,
                         "age_scale": args.age_scale,
+                        "age_loss_fn": args.age_loss_fn
                     }
                 )
 

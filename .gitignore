@@ -34,3 +34,4 @@ eg3d/training-runs
 *.prototxt
 *.caffemodel
 .vscode/launch.json
+eg3d/Experiments/train.sh
