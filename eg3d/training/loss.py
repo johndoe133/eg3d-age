@@ -53,8 +53,7 @@ class StyleGAN2Loss(Loss):
         self.filter_mode = filter_mode
         self.resample_filter = upfirdn2d.setup_filter([1,3,3,1], device=device)
         self.blur_raw_target = True
-        self.age_model = AgeEstimator(device='gpu')
-        self.age_model2 = AgeEstimator2()
+        self.age_model = AgeEstimator2()
         assert self.gpc_reg_prob is None or (0 <= self.gpc_reg_prob <= 1)
 
 
@@ -75,7 +74,7 @@ class StyleGAN2Loss(Loss):
         """
         #pred_ages = self.AgeEstimator2(imgs)
         images = imgs['image']
-        predicted_ages = self.age_model2.estimate_age(images)
+        predicted_ages = self.age_model.estimate_age(images)
         predicted_ages = predicted_ages.to(self.device)
         ages = c[:,-1]
         if loss == "MSE":
