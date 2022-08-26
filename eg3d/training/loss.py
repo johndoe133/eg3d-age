@@ -58,7 +58,21 @@ class StyleGAN2Loss(Loss):
         assert self.gpc_reg_prob is None or (0 <= self.gpc_reg_prob <= 1)
 
 
-    def run_age_loss2(self, imgs, c, loss="MSE"):
+    def run_age_loss(self, imgs, c, loss="MSE"):
+        """Returns the age loss given a series of generated images and the age the synthetic images
+        are suppose to resemble.
+
+        Args:
+            imgs (tensor): tensor of images 
+            c (tensor): conditions
+            loss (str, optional): loss function. Defaults to "MSE".
+
+        Raises:
+            NotImplementedError: If the loss function isn't implemented
+
+        Returns:
+            tensor: loss
+        """
         #pred_ages = self.AgeEstimator2(imgs)
         images = imgs['image']
         predicted_ages = self.age_model2.estimate_age(images)
@@ -71,29 +85,6 @@ class StyleGAN2Loss(Loss):
         else:
             raise NotImplementedError
         return loss
-
-        
-        #https://github.com/yuval-alaluf/SAM/blob/4e46fb5ba28fe4e4c4671fa6d0503e97c4848cb5/criteria/aging_loss.py
-        return True
-
-    def run_age_loss(self, imgs, ages, error_function = "MSE"):
-        """Returns the age loss given a series of generated images and the age the synthetic images
-        are suppose to resemble.
-
-        Args:
-            imgs (tensor): tensor of images 
-            ages (tensor): tensor of ages
-            error_function (str, optional): The error function used. Defaults to "MSE". MSE and MAE available.
-
-        Returns:
-            tensor: age loss
-        """
-        pred_ages = self.age_model.estimate(imgs)
-        ages = ages.cpu().detach().numpy()
-        if error_function == "MSE":
-            return torch.mean(torch.square(torch.tensor(pred_ages - ages)))
-        elif error_function == "MAE":
-            return torch.mean(torch.abs(torch.tensor(pred_ages - ages)))
 
     def run_G(self, z, c, swapping_prob, neural_rendering_resolution, update_emas=False):
         if swapping_prob is not None:
@@ -161,15 +152,14 @@ class StyleGAN2Loss(Loss):
             with torch.autograd.profiler.record_function('Gmain_forward'):
                 gen_img, _gen_ws = self.run_G(gen_z, gen_c, swapping_prob=swapping_prob, neural_rendering_resolution=neural_rendering_resolution)
                 gen_logits = self.run_D(gen_img, gen_c, blur_sigma=blur_sigma)
-                age_loss2 = self.run_age_loss2(gen_img, gen_c, loss=age_loss_fn)
-                age_loss = self.run_age_loss(gen_img['image'], gen_c[:, -1], error_function="MSE")
+                age_loss = self.run_age_loss(gen_img, gen_c, loss=age_loss_fn)
                 training_stats.report('Loss/scores/fake', gen_logits)
                 training_stats.report('Loss/signs/fake', gen_logits.sign())
                 training_stats.report('Loss/scores/age', age_loss)
                 loss_Gmain = torch.nn.functional.softplus(-gen_logits)
                 training_stats.report('Loss/G/loss', loss_Gmain)
             with torch.autograd.profiler.record_function('Gmain_backward'):
-                (loss_Gmain.mean() + age_loss2 * age_scale).mul(gain).backward() # added age loss
+                (loss_Gmain.mean() + age_loss * age_scale).mul(gain).backward() # added age loss
                 # torch.add(loss_Gmain.mean(),age_loss).mul(gain).backward()
 
         # Density Regularization

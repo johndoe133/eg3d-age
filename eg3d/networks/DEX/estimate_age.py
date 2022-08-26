@@ -15,7 +15,7 @@ class AgeEstimator2():
     def estimate_age(self, gen_img):
         gen_img = self.resize(gen_img) # resize to fit model
         lo, hi = torch.min(gen_img).item(), torch.max(gen_img).item() 
-        #adjust pixel values to 0 - 255
+        # adjust pixel values to 0 - 255
         gen_img = (gen_img - lo) * (255 / (hi - lo))
         gen_img = gen_img.type(torch.uint8) # round of pixels
         gen_img = gen_img.type('torch.FloatTensor') # input type of age model
