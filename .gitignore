@@ -33,3 +33,4 @@ eg3d/training-runs
 *.pth
 *.prototxt
 *.caffemodel
+.vscode/launch.json
