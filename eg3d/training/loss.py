@@ -18,6 +18,7 @@ from torch_utils.ops import upfirdn2d
 from training.dual_discriminator import filtered_resizing
 from training.age_estimation import AgeEstimator
 from networks.DEX.estimate_age import AgeEstimator2
+import time
 #----------------------------------------------------------------------------
 
 class Loss:
@@ -54,6 +55,8 @@ class StyleGAN2Loss(Loss):
         self.resample_filter = upfirdn2d.setup_filter([1,3,3,1], device=device)
         self.blur_raw_target = True
         self.age_model = AgeEstimator2()
+        self.age_loss_MSE = torch.nn.MSELoss()
+        self.age_loss_L1 = torch.nn.L1Loss()
         assert self.gpc_reg_prob is None or (0 <= self.gpc_reg_prob <= 1)
 
 
@@ -78,9 +81,9 @@ class StyleGAN2Loss(Loss):
         predicted_ages = predicted_ages.to(self.device)
         ages = c[:,-1]
         if loss == "MSE":
-            loss = torch.nn.MSELoss()(predicted_ages, ages)
+            loss = self.age_loss_MSE(predicted_ages, ages) #test
         elif loss =="MAE" or loss=="L1":
-            loss = torch.nn.L1Loss()(predicted_ages, ages)
+            loss = self.age_loss_MSE(predicted_ages, ages)
         else:
             raise NotImplementedError
         return loss
@@ -152,14 +155,14 @@ class StyleGAN2Loss(Loss):
                 gen_img, _gen_ws = self.run_G(gen_z, gen_c, swapping_prob=swapping_prob, neural_rendering_resolution=neural_rendering_resolution)
                 gen_logits = self.run_D(gen_img, gen_c, blur_sigma=blur_sigma)
                 age_loss = self.run_age_loss(gen_img, gen_c, loss=age_loss_fn)
+                age_loss = age_loss * age_scale # age scaling
                 training_stats.report('Loss/scores/fake', gen_logits)
                 training_stats.report('Loss/signs/fake', gen_logits.sign())
                 training_stats.report('Loss/scores/age', age_loss)
                 loss_Gmain = torch.nn.functional.softplus(-gen_logits)
                 training_stats.report('Loss/G/loss', loss_Gmain)
             with torch.autograd.profiler.record_function('Gmain_backward'):
-                (loss_Gmain.mean() + age_loss * age_scale).mul(gain).backward() # added age loss
-                # torch.add(loss_Gmain.mean(),age_loss).mul(gain).backward()
+                (loss_Gmain.mean() + (age_loss)).mul(gain).backward() # added age loss
 
         # Density Regularization
         if phase in ['Greg', 'Gboth'] and self.G.rendering_kwargs.get('density_reg', 0) > 0 and self.G.rendering_kwargs['reg_type'] == 'l1':

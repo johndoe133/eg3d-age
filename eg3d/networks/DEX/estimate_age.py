@@ -9,6 +9,7 @@ class AgeEstimator2():
         self.age_model_path = os.path.join("./networks/DEX/dex", 'pth/age_sd.pth')
         self.age_model = Age()
         self.age_model.load_state_dict(torch.load(self.age_model_path))
+        self.age_model.requires_grad_(requires_grad=False) # weights are freezed 
         self.age_model.eval()
         self.n = torch.arange(0,101)
 
