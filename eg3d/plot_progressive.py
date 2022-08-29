@@ -48,6 +48,11 @@ def generate_images(
     
     z = torch.from_numpy(np.random.RandomState(seed).randn(1, G.z_dim)).to(device)
 
+    def normalize(x, rmin = 5, rmax = 80, tmin = -1, tmax = 1):
+        # normalize age between -1 and 1
+        z = ((x - rmin) / (rmax - rmin)) * (tmax - tmin) + tmin
+        return z
+
     fov_deg = 18.837
     cam2world_pose = LookAtPoseSampler.sample(3.14/2, 3.14/2, torch.tensor([0, 0, 0.2], device=device), radius=2.7, device=device)
     intrinsics = FOV_to_intrinsics(fov_deg, device=device)
@@ -56,6 +61,8 @@ def generate_images(
 
     angle_p = -0.2
     ages = [5,10,20,30,40,50,60,70]
+    ages = [normalize(age) for age in ages]
+
     for angle_y, angle_p in [(.4, angle_p), (0, angle_p), (-.4, angle_p)]:
         cam_pivot = torch.tensor(G.rendering_kwargs.get('avg_camera_pivot', [0, 0, 0]), device=device)
         cam_radius = G.rendering_kwargs.get('avg_camera_radius', 2.7)

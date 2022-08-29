@@ -95,7 +95,8 @@ def save_image_grid(img, fname, drange, grid_size, ages=None):
             counter = 0
             for r in range(gh):
                 for c in range(gw):
-                    text_added.text((c*H,r*W),str(int(ages[counter])), font=font) # untested
+                    age = denormalize(ages[counter])
+                    text_added.text((c*H,r*W),str(int(age)), font=font) # untested
                     counter += 1
             img_grid.save(fname)
     if C == 3:
@@ -105,9 +106,30 @@ def save_image_grid(img, fname, drange, grid_size, ages=None):
             counter = 0
             for r in range(gh):
                 for c in range(gw):
-                    text_added.text((c*H,r*W),str(int(ages[counter])), font=font) # untested
+                    age = denormalize(ages[counter])
+                    text_added.text((c*H,r*W),str(int(age)), font=font) # untested
                     counter += 1
             img_grid.save(fname)
+
+#----------------------------------------------------------------------------
+
+def denormalize(z, rmin = 5, rmax = 80, tmin = -1, tmax = 1):
+    """To go from the normalized ages ranged from -1 to 1 to actual ages.
+    The normalization of the ages are based on a range age from 5 to 80 years 
+    and so the denormalization is the same. 
+
+    Args:
+        z (_type_): normalized value
+        rmin (int, optional): Defaults to 5.
+        rmax (int, optional): Defaults to 80.
+        tmin (int, optional): Defaults to -1.
+        tmax (int, optional): Defaults to 1.
+
+    Returns:
+        float: denormalized age
+    """
+    x = (z*(rmax - rmin)- tmin*(rmax-rmin))/(tmax-tmin)+rmin
+    return x
 
 #----------------------------------------------------------------------------
 
@@ -124,6 +146,7 @@ def generate_age(minimum, maximum, distribution = "uniform"):
     """
     # transform ages to range -1 to 1
     def normalize(x, rmin = 5, rmax = 80, tmin = -1, tmax = 1):
+        #https://stats.stackexchange.com/questions/281162/scale-a-number-between-a-range 
         z = ((x - rmin) / (rmax - rmin)) * (tmax - tmin) + tmin
         return np.round(z, 4)
 
