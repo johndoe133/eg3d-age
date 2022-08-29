@@ -192,7 +192,8 @@ def parse_comma_separated_list(s):
 @click.option('--density_reg_p_dist',    help='density regularization strength.', metavar='FLOAT', type=click.FloatRange(min=0), default=0.004, required=False, show_default=True)
 @click.option('--reg_type', help='Type of regularization', metavar='STR',  type=click.Choice(['l1', 'l1-alt', 'monotonic-detach', 'monotonic-fixed', 'total-variation']), required=False, default='l1')
 @click.option('--decoder_lr_mul',    help='decoder learning rate multiplier.', metavar='FLOAT', type=click.FloatRange(min=0), default=1, required=False, show_default=True)
-@click.option('--age_scale',    help='Scales age loss.', metavar='FLOAT', type=click.FloatRange(min=0, max=1), default=1, required=False, show_default=True)
+@click.option('--age_scale',    help='Scales age loss.', metavar='FLOAT', default=1.0, required=False, show_default=True)
+@click.option('--id_scale',    help='Scales id loss.', metavar='FLOAT', default=10.0, required=False, show_default=True)
 @click.option('--age_loss_fn',    help='Type of age loss function', metavar='STR', default="MSE", required=False)
 
 
@@ -255,6 +256,7 @@ def main(**kwargs):
     c.random_seed = c.training_set_kwargs.random_seed = opts.seed
     c.data_loader_kwargs.num_workers = opts.workers
     c.age_scale = opts.age_scale
+    c.id_scale = opts.id_scale
     c.age_loss_fn = opts.age_loss_fn
 
     # Sanity checks.
