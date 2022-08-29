@@ -17,14 +17,14 @@ parser.add_argument("--gamma", help="",default = 5)
 parser.add_argument("--resume", help="",default = None)
 parser.add_argument("--devices", help="",default = '0,1')
 parser.add_argument("--data", help="",default = 'datasets/FFHQ_128')
-parser.add_argument("--age_scale", help="",default = '0.1')
+parser.add_argument("--age_scale", help="",default = '1')
 parser.add_argument("--age_loss_fn", help="", default="MSE")
 
 args = parser.parse_args()
 
 args.logs_dir = Path(args.logs_dir)
 
-if args.queue_name not in ['gpua100', 'gpuv100']:
+if args.queue_name not in ['gpua100', 'gpuv100', 'gpuvoltasxm2']:
     raise Exception('Invalid queue name! Queue must be gpua100, gpuv100, or xx')
 elif args.queue_name == 'gpuv100':
     if args.gpu_mem > 32:

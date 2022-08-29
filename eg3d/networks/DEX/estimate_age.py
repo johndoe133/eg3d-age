@@ -21,7 +21,17 @@ class AgeEstimator2():
         gen_img = gen_img.type(torch.uint8) # round of pixels
         gen_img = gen_img.type('torch.FloatTensor') # input type of age model
         age_predictions = self.predict_ages(gen_img)
+        age_predictions = self.normalize_ages(age_predictions)
         return age_predictions
+
+    def normalize_ages(self, age, rmin = 5, rmax = 80, tmin = -1, tmax = 1):
+        z = ((age - rmin) / (rmax - rmin)) * (tmax - tmin) + tmin
+        return torch.round(z, decimals=4)
+
+
+    def normalize(x, rmin = 5, rmax = 80, tmin = -1, tmax = 1):
+        z = ((x - rmin) / (rmax - rmin)) * (tmax - tmin) + tmin
+        return round(z, 4)
 
     def predict_ages(self, images):
         P_predictions = self.age_model(images)

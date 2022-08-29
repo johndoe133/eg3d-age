@@ -122,10 +122,17 @@ def generate_age(minimum, maximum, distribution = "uniform"):
     Returns:
         np.array size 1: generated age 
     """
+    # transform ages to range -1 to 1
+    def normalize(x, rmin = 5, rmax = 80, tmin = -1, tmax = 1):
+        z = ((x - rmin) / (rmax - rmin)) * (tmax - tmin) + tmin
+        return np.round(z, 4)
+
     if distribution == "uniform":
-        return np.random.randint(minimum, maximum + 1, size=1) #.astype("float")
+        r = np.random.randint(minimum, maximum + 1, size=1) 
+        return normalize(r)
     elif distribution == "triangular":
-        return np.random.triangular(minimum, minimum + (maximum-minimum) // 2, size = 1) #.astype("float")
+        r = np.random.triangular(minimum, minimum + (maximum-minimum) // 2, size = 1) 
+        return normalize(r)
 
 #----------------------------------------------------------------------------
 
@@ -307,7 +314,7 @@ def training_loop(
             all_gen_z = [phase_gen_z.split(batch_gpu) for phase_gen_z in all_gen_z.split(batch_size)]
             all_gen_c = [training_set.get_label(np.random.randint(len(training_set))) for _ in range(len(phases) * batch_size)]
             # replace age sampled from dataset.json with generated age between range
-            all_gen_c = [np.concatenate([gen_c_initial[:-1], generate_age(10, 70)]) for gen_c_initial in all_gen_c]
+            all_gen_c = [np.concatenate([gen_c_initial[:-1], generate_age(5, 80)]) for gen_c_initial in all_gen_c]
             all_gen_c = torch.from_numpy(np.stack(all_gen_c)).pin_memory().to(device)
             all_gen_c = all_gen_c.float() # needed
             all_gen_c = [phase_gen_c.split(batch_gpu) for phase_gen_c in all_gen_c.split(batch_size)]
