@@ -329,14 +329,12 @@ def load_weights(mdl, name):
     else:
         raise ValueError('Pretrained models only exist for "vggface2" and "casia-webface"')
 
-    model_dir = os.path.join(get_torch_home(), 'checkpoints')
-    os.makedirs(model_dir, exist_ok=True)
+    model_dir = r"./networks/face_id_model.pt"
 
-    cached_file = os.path.join(model_dir, os.path.basename(path))
-    if not os.path.exists(cached_file):
+    if not os.path.exists(model_dir):
         print('path doesn\'t exist')
 
-    state_dict = torch.load(cached_file)
+    state_dict = torch.load(model_dir)
     mdl.load_state_dict(state_dict)
 
 
