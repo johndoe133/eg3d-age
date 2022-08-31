@@ -18,7 +18,7 @@ class AgeEstimator2():
         lo, hi = torch.min(gen_img).item(), torch.max(gen_img).item() 
         # adjust pixel values to 0 - 255
         gen_img = (gen_img - lo) * (255 / (hi - lo))
-        gen_img = gen_img.type(torch.uint8) # round of pixels
+        gen_img = torch.floor(gen_img) # round of pixels
         gen_img = gen_img.type('torch.FloatTensor') # input type of age model
         age_predictions = self.predict_ages(gen_img)
         age_predictions = self.normalize_ages(age_predictions)
