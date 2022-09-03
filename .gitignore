@@ -35,3 +35,5 @@ eg3d/training-runs
 *.caffemodel
 .vscode/launch.json
 eg3d/Experiments/train.sh
+eg3d/age_distribution.png
+.vscode/launch.json
