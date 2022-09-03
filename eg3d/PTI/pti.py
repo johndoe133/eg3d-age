@@ -21,8 +21,8 @@ paths_config.e4e = './PTI/pretrained_models/e4e_ffhq_encode.pt'
 paths_config.input_data_id = image_dir_name
 paths_config.input_data_path = './PTI/image_processed'
 paths_config.stylegan2_ada_ffhq = './training-runs/00079-ffhq-FFHQ_512-gpus2-batch8-gamma5/network-snapshot-000200.pkl'
-paths_config.checkpoints_dir = './'
-paths_config.style_clip_pretrained_mappers = '.PTI/pretrained_models'
+paths_config.checkpoints_dir = './PTI/embeddings'
+paths_config.style_clip_pretrained_mappers = './PTI/pretrained_models'
 hyperparameters.use_locality_regularization = False
 
 # pre_process_images(f'./{image_dir_name}_original')

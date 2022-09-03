@@ -9,10 +9,10 @@ ir_se50 = './pretrained_models/model_ir_se50.pth'
 dlib = f'{home}/Documents/eg3d-age/eg3d/networks/align.dat'
 
 ## Dirs for output files
-checkpoints_dir = './checkpoints'
-embedding_base_dir = '.'
+checkpoints_dir = f'{home}/Documents/eg3d-age/eg3d/PTI/checkpoints'
+embedding_base_dir = f'{home}/Documents/eg3d-age/eg3d/PTI/embeddings'
 styleclip_output_dir = './StyleCLIP_results'
-experiments_output_dir = './output'
+experiments_output_dir = f'{home}/Documents/eg3d-age/eg3d/PTI/output'
 
 ## Input info
 ### Input dir, where the images reside
