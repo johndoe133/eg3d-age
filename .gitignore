@@ -37,3 +37,5 @@ eg3d/training-runs
 eg3d/Experiments/train.sh
 eg3d/age_distribution.png
 .vscode/launch.json
+eg3d/networks/align.dat
+eg3d/networks/face_id_model.pt
