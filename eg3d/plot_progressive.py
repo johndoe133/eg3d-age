@@ -109,7 +109,7 @@ def generate_images(
 
     ######## GIF #########
     print("Creating .gif file...")
-    ages = np.linspace(-1,1,30)
+    ages = np.linspace(-1,1,75) #one for each age
     imgs_gif = []
     font = ImageFont.truetype("FreeSerif.ttf", 40)
     
