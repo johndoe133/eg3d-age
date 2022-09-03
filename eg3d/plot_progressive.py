@@ -6,6 +6,7 @@ import click
 import dnnlib
 import numpy as np
 import PIL.Image
+from PIL import ImageDraw, ImageFont
 import torch
 from tqdm import tqdm
 import mrcfile
@@ -15,6 +16,7 @@ import legacy
 from camera_utils import LookAtPoseSampler, FOV_to_intrinsics
 from torch_utils import misc
 from training.triplane import TriPlaneGenerator
+from training.training_loop import denormalize
 import imageio
 
 @click.command()
@@ -29,6 +31,7 @@ import imageio
 @click.option('--fov-deg', help='Field of View of camera in degrees', type=int, required=False, metavar='float', default=18.837, show_default=True)
 @click.option('--shape-format', help='Shape Format', type=click.Choice(['.mrc', '.ply']), default='.mrc')
 @click.option('--reload_modules', help='Overload persistent modules?', type=bool, required=False, metavar='BOOL', default=False, show_default=True)
+@click.option('--img_h', help='Height/width of image', default=512, required=False)
 def generate_images(
     network_folder: str,
     network: str,
@@ -41,6 +44,7 @@ def generate_images(
     shape_format: str,
     class_idx: Optional[int],
     reload_modules: bool,
+    img_h: int,
 ):
     print(f'Loading networks from "{network_folder}"...')
     device = torch.device('cuda')
@@ -96,7 +100,6 @@ def generate_images(
     no_ages = len(ages)
     img = torch.cat(imgs, dim=2)
     #t = torch.zeros((128*angles, 128*no_ages, 3))
-    img_h=128
     img_stack=[]
     for i in range(angles):
         img_stack.append(img[0][:, i*img_h*no_ages: (i+1)*img_h*no_ages,:])
@@ -104,9 +107,11 @@ def generate_images(
     PIL.Image.fromarray(t.cpu().numpy(), 'RGB').save(f'{network_folder}/seed{seed:04d}.png')
     print(f'saved at {outdir}/seed{seed:04d}.png')
 
+    ######## GIF #########
     print("Creating .gif file...")
     ages = np.linspace(-1,1,30)
     imgs_gif = []
+    font = ImageFont.truetype("FreeSerif.ttf", 40)
     
     angle_y, angle_p = (0, -0.2)
     cam_pivot = torch.tensor(G.rendering_kwargs.get('avg_camera_pivot', [0, 0, 0]), device=device)
@@ -125,9 +130,13 @@ def generate_images(
         img = G.synthesis(ws, c_params)['image']
 
         img = (img.permute(0, 2, 3, 1) * 127.5 + 128).clamp(0, 255).to(torch.uint8)
-        imgs_gif.append(img)
+        pil_img = PIL.Image.fromarray(img[0,:,:,:].cpu().numpy().astype('uint8')) # to draw on
+        text_added = ImageDraw.Draw(pil_img)
+        text_color="#A0240A"
+        text_added.text((0,450), f"Age: {int(denormalize(age))}", font=font, fill=text_color)
+        imgs_gif.append(np.array(pil_img))
 
-    imgs_gif = [tensor.cpu().numpy()[0,:,:,:] for tensor in imgs_gif]
+    # imgs_gif = [tensor.cpu().numpy()[0,:,:,:] for tensor in imgs_gif]
     print("Saving gif..")
     imageio.mimsave(f'{network_folder}/seed{seed:04d}.gif', imgs_gif)
     print("Exiting..")
