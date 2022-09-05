@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd    
 import time
+import json
 
 @click.command()
 @click.option('--training_run', type=str, help='Past in folder name in training run', required=True)
@@ -41,8 +42,8 @@ def generate_images(
         r1_penalty.append(data['Loss/r1_penalty']['mean'])
         loss_age.append(data['Loss/scores/age']['mean'])
         loss_age_std.append(data['Loss/scores/age']['std'])
-        loss_id.append(data['Loss/scores/age']['mean'])
-        loss_id_std.append(data['Loss/scores/age']['std'])
+        loss_id.append(data['Loss/scores/id']['mean'])
+        loss_id_std.append(data['Loss/scores/id']['std'])
         hours.append(data['Timing/total_hours']['mean'])
     
     fid = []
@@ -52,6 +53,12 @@ def generate_images(
     for row in fid_df.iterrows():
         fid.append(row[1]["results"]["fid50k_full"])
     
+    training_option_path = os.path.join(root, training_run, "training_options.json")
+    f = open(training_option_path)
+    training_option = json.load(f)
+    id_scale = training_option['id_scale']
+    age_scale = training_option['age_scale']
+    f.close()
 
     #convert to numpy
     loss_scores_fake, loss_G, loss_D, r1_penalty, loss_age, loss_id, hours = np.array(loss_scores_fake), np.array(loss_G), np.array(loss_D), np.array(r1_penalty), np.array(loss_age), np.array(loss_id), np.array(hours)
@@ -62,50 +69,54 @@ def generate_images(
     x = range(len(hours))
     
     #GD_ylim = max(list(loss_G + loss_G_std) + list(loss_D + loss_D_std)) * 1.10
-    ## GENERATOR LOSS ##
-    axs1 = fig.add_subplot(3,2,1)
-    axs1.set_ylabel("G loss")
-    axs1.fill_between(x, loss_G - loss_G_std, loss_G + loss_G_std, alpha=0.4, label="std")
-    axs1.set_ylim(0,max(loss_G + loss_G_std)*1.10)
-    axs1.plot(x, loss_G, label="Loss")
-    axs1.legend()    
-
-    ## DISCRIMINATOR LOSS ##
-    axs2 = fig.add_subplot(3,2,3)
-    axs2.plot(x, loss_D, label="Loss")
-    axs2.set_ylabel("D loss")
-    axs2.set_ylim(0,max(loss_D + loss_D_std)*1.10)
-    axs2.fill_between(x, loss_D - loss_D_std, loss_D + loss_D_std, alpha=0.4, label="std")
-    axs2.legend()
-
-    ## FID score
-    axs3 = fig.add_subplot(3,2,5)
-    axs3.set_ylabel("FID Score")
-    axs3.bar(range(len(fid)), fid, zorder=20)
-    axs3.set_xticks([])
-    axs3.grid(axis='y')
-
     ## AGE LOSS ##
-    axs4 = fig.add_subplot(2,2,2)
-    axs4.plot(x, loss_age, label="Loss")
+    axs1 = fig.add_subplot(3,2,1)
+    axs1.plot(x, loss_age, label="Loss")
     age_loss_ylim = max(loss_age + loss_age_std)
-    axs4.set_ylabel("Age loss")
-    axs4.set_ylim(0, age_loss_ylim*1.05)
-    axs4.fill_between(x, loss_age - loss_age_std, loss_age + loss_age_std, alpha=0.4, label="std")
-    axs4.legend()
+    axs1.set_ylabel("Age loss")
+    axs1.set_ylim(0, age_loss_ylim*1.05)
+    axs1.fill_between(x, loss_age - loss_age_std, loss_age + loss_age_std, alpha=0.4, label="std")
+    axs1.set_title(f"With age_scale = {age_scale}")
+    axs1.legend()
 
     ## ID LOSS ##
-    axs5 = fig.add_subplot(2,2,4)
-    axs5.plot(x, loss_id, label="Loss")
+    axs2 = fig.add_subplot(3,2,2)
+    axs2.plot(x, loss_id, label="Loss")
     id_loss_ylim = max(loss_id + loss_id_std)
-    axs5.set_ylabel("ID loss")
-    axs5.set_ylim(0, id_loss_ylim*1.05)
-    axs5.fill_between(x, loss_id - loss_id_std, loss_id + loss_id_std, alpha=0.4, label="std")
-    axs5.legend()
+    axs2.set_ylabel("ID loss")
+    axs2.set_ylim(0, id_loss_ylim*1.05)
+    axs2.fill_between(x, loss_id - loss_id_std, loss_id + loss_id_std, alpha=0.4, label="std")
+    axs2.set_title(f"With id_scale = {id_scale}")
+    axs2.legend()
+
+    ## GENERATOR LOSS ##
+    axs3 = fig.add_subplot(3,2,3)
+    axs3.set_ylabel("G loss")
+    axs3.fill_between(x, loss_G - loss_G_std, loss_G + loss_G_std, alpha=0.4, label="std")
+    axs3.set_ylim(0,max(loss_G + loss_G_std)*1.10)
+    axs3.plot(x, loss_G, label="Loss")
+    axs3.legend()    
+
+    ## DISCRIMINATOR LOSS ##
+    axs4 = fig.add_subplot(3,2,4)
+    axs4.plot(x, loss_D, label="Loss")
+    axs4.set_ylabel("D loss")
+    axs4.set_ylim(0,max(loss_D + loss_D_std)*1.10)
+    axs4.fill_between(x, loss_D - loss_D_std, loss_D + loss_D_std, alpha=0.4, label="std")
+    axs4.legend()
+
+    ## FID score
+    axs5 = fig.add_subplot(3,2,5)
+    axs5.set_ylabel("FID Score")
+    axs5.bar(range(len(fid)), fid, zorder=20)
+    axs5.set_xticks([])
+    axs5.grid(axis='y')
+
     
     # save figure
     plot_name = name
     plot_path = os.path.join(root, outdir, plot_name)
+    fig.tight_layout()
     fig.savefig(plot_path)
 
     print("Ending program...")
