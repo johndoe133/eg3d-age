@@ -14,8 +14,8 @@ class SingleIDCoach(BaseCoach):
     def train(self):
 
         w_path_dir = f'{paths_config.embedding_base_dir}/{paths_config.input_data_id}'
-        os.makedirs(w_path_dir, exist_ok=True)
-        os.makedirs(f'{w_path_dir}/{paths_config.pti_results_keyword}', exist_ok=True)
+        # os.makedirs(w_path_dir, exist_ok=True)
+        # os.makedirs(f'{w_path_dir}/{paths_config.pti_results_keyword}', exist_ok=True)
 
         use_ball_holder = True
 
@@ -27,7 +27,7 @@ class SingleIDCoach(BaseCoach):
             if self.image_counter >= hyperparameters.max_images_to_invert:
                 break
 
-            embedding_dir = f'{w_path_dir}/{paths_config.pti_results_keyword}/{image_name}'
+            embedding_dir = f'{paths_config.embedding_base_dir}/w' #/{paths_config.pti_results_keyword}/{image_name}'
             os.makedirs(embedding_dir, exist_ok=True)
 
             w_pivot = None
@@ -41,7 +41,7 @@ class SingleIDCoach(BaseCoach):
             # w_pivot = w_pivot.detach().clone().to(global_config.device)
             w_pivot = w_pivot.to(global_config.device)
 
-            torch.save(w_pivot, f'{embedding_dir}/0.pt')
+            torch.save(w_pivot, f'{embedding_dir}/{image_name}.pt')
             log_images_counter = 0
             real_images_batch = image.to(global_config.device)
 
@@ -68,6 +68,8 @@ class SingleIDCoach(BaseCoach):
                 log_images_counter += 1
 
             self.image_counter += 1
-
+            model_path = f'{paths_config.checkpoints_dir}/G'
+            os.makedirs(model_path, exist_ok=True)
+            model_name = os.path.join(model_path, f'{image_name}.pt')
             torch.save(self.G,
-                       f'{paths_config.checkpoints_dir}/model_{global_config.run_name}_{image_name}.pt')
+                       model_name)

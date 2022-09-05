@@ -55,7 +55,7 @@ class BaseCoach:
         self.optimizer = self.configure_optimizers()
 
     def get_inversion(self, w_path_dir, image_name, image):
-        embedding_dir = f'{w_path_dir}/{paths_config.pti_results_keyword}/{image_name}'
+        embedding_dir = f'{w_path_dir}'#/{paths_config.pti_results_keyword}/{image_name}'
         os.makedirs(embedding_dir, exist_ok=True)
 
         w_pivot = None
