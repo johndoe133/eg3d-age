@@ -25,7 +25,7 @@ def run_PTI(run_name='', use_wandb=False, use_multi_id_training=False):
     global_config.pivotal_training_steps = 1
     global_config.training_step = 1
 
-    embedding_dir_path = f'{paths_config.embedding_base_dir}/{paths_config.input_data_id}/{paths_config.pti_results_keyword}'
+    embedding_dir_path = f'{paths_config.embedding_base_dir}' #/{paths_config.input_data_id}/{paths_config.pti_results_keyword}'
     os.makedirs(embedding_dir_path, exist_ok=True)
 
     dataset = ImagesDataset(paths_config.input_data_path, transforms.Compose([

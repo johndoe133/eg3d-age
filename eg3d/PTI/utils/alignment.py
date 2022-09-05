@@ -4,6 +4,7 @@ import PIL.Image
 import scipy
 import scipy.ndimage
 import dlib
+import cv2
 
 
 def get_landmark(filepath, predictor):
@@ -12,7 +13,8 @@ def get_landmark(filepath, predictor):
     """
     detector = dlib.get_frontal_face_detector()
 
-    img = dlib.load_rgb_image(filepath)
+    # img = dlib.load_rgb_image(filepath) doesnt work for some reason
+    img = cv2.cvtColor(cv2.imread(filepath), cv2.COLOR_BGR2RGB)
     dets = detector(img, 1)
 
     for k, d in enumerate(dets):
