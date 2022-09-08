@@ -133,6 +133,25 @@ def denormalize(z, rmin = 5, rmax = 80, tmin = -1, tmax = 1):
 
 #----------------------------------------------------------------------------
 
+def normalize(x, rmin = 5, rmax = 80, tmin = -1, tmax = 1):
+    """Transforms ages to be between -1 and 1
+
+    Args:
+        x: input age
+        rmin (int, optional): Defaults to 5.
+        rmax (int, optional): Defaults to 80.
+        tmin (int, optional): Defaults to -1.
+        tmax (int, optional): Defaults to 1.
+
+    Returns:
+        normalized age
+    """
+    #https://stats.stackexchange.com/questions/281162/scale-a-number-between-a-range 
+    z = ((x - rmin) / (rmax - rmin)) * (tmax - tmin) + tmin
+    return np.round(z, 4)
+
+#----------------------------------------------------------------------------
+
 def generate_age(minimum, maximum, distribution = "uniform"):
     """Generates an age between a min and max.
 
@@ -144,12 +163,7 @@ def generate_age(minimum, maximum, distribution = "uniform"):
     Returns:
         np.array size 1: generated age 
     """
-    # transform ages to range -1 to 1
-    def normalize(x, rmin = 5, rmax = 80, tmin = -1, tmax = 1):
-        #https://stats.stackexchange.com/questions/281162/scale-a-number-between-a-range 
-        z = ((x - rmin) / (rmax - rmin)) * (tmax - tmin) + tmin
-        return np.round(z, 4)
-
+    
     if distribution == "uniform":
         r = np.random.randint(minimum, maximum + 1, size=1) 
         return normalize(r)
@@ -334,11 +348,17 @@ def training_loop(
             phase_real_img, phase_real_c = next(training_set_iterator)
             phase_real_img = (phase_real_img.to(device).to(torch.float32) / 127.5 - 1).split(batch_gpu)
             phase_real_c = phase_real_c.to(device).split(batch_gpu)
-            all_gen_z = torch.randn([len(phases) * batch_size, G.z_dim], device=device)
+            # all_gen_z = torch.randn([len(phases) * batch_size, G.z_dim], device=device)
+            all_gen_z = torch.randn([len(phases) * batch_size//2, G.z_dim], device=device)
+            all_gen_z = torch.repeat_interleave(all_gen_z, 2, dim=0) # repeat latent codes 
             all_gen_z = [phase_gen_z.split(batch_gpu) for phase_gen_z in all_gen_z.split(batch_size)]
-            all_gen_c = [training_set.get_label(np.random.randint(len(training_set))) for _ in range(len(phases) * batch_size)]
+            all_gen_c = [training_set.get_label(np.random.randint(len(training_set))) for _ in range(len(phases) * batch_size//2)]
+            all_gen_c_new = []
+            for element in all_gen_c: # repeat each element
+                all_gen_c_new.append(element)
+                all_gen_c_new.append(element)
             # replace age sampled from dataset.json with generated age between range
-            all_gen_c = [np.concatenate([gen_c_initial[:-1], generate_age(5, 80)]) for gen_c_initial in all_gen_c]
+            all_gen_c = [np.concatenate([gen_c_initial[:-1], generate_age(5, 80)]) for gen_c_initial in all_gen_c_new]
             all_gen_c = torch.from_numpy(np.stack(all_gen_c)).pin_memory().to(device)
             all_gen_c = all_gen_c.float() # needed
             all_gen_c = [phase_gen_c.split(batch_gpu) for phase_gen_c in all_gen_c.split(batch_size)]

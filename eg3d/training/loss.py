@@ -61,7 +61,7 @@ class StyleGAN2Loss(Loss):
         self.age_loss_MSE = torch.nn.MSELoss()
         self.age_loss_L1 = torch.nn.L1Loss()
         self.cosine_sim = torch.nn.CosineSimilarity()
-        self.id_model = InceptionResnetV1(pretrained='vggface2', device=device).requires_grad_(requires_grad=False)
+        self.id_model = InceptionResnetV1(pretrained='vggface2', device=device).requires_grad_(requires_grad=False).eval()
         assert self.gpc_reg_prob is None or (0 <= self.gpc_reg_prob <= 1)
 
 
@@ -93,6 +93,23 @@ class StyleGAN2Loss(Loss):
             raise NotImplementedError
         return loss
 
+    def pairwise(self, iterable):
+        "s -> (s0, s1), (s2, s3), (s4, s5), ..."
+        a = iter(iterable)
+        return zip(a, a)
+
+    def run_id_loss2(self, imgs, loss='MSE'):
+        images = imgs['image']
+        total_loss = 0
+        for img1, img2 in self.pairwise(images): # every pair should have the same latent code and same c except for the age parameter
+            latent_coords_1 = self.id_model(img1[None, :, :, :]) # to get the proper shape of [1, C, W, H] and not [C, W, H]
+            latent_coords_2 = self.id_model(img2[None, :, :, :])
+            constant = 1e-8
+            cos = 1 + self.cosine_sim(latent_coords_1, latent_coords_2) + constant
+            loss = - torch.log10(cos) + torch.log10(torch.tensor([2 + constant], device=self.device))
+            total_loss += loss
+
+        return total_loss
     def run_id_loss(self, imgs, z, c, swapping_prob, neural_rendering_resolution, margin=0.2, loss='MSE'):
         """Returns the identity loss of a subject by comparing the given images to the images aged and young-ified. 
         
@@ -201,7 +218,8 @@ class StyleGAN2Loss(Loss):
                 gen_logits = self.run_D(gen_img, gen_c, blur_sigma=blur_sigma)
                 age_loss = self.run_age_loss(gen_img, gen_c, loss=age_loss_fn)
                 age_loss_scaled = age_loss * age_scale # age scaling
-                id_loss = self.run_id_loss(gen_img, gen_z, gen_c, swapping_prob, neural_rendering_resolution, loss='cosine_similarity')
+                # id_loss = self.run_id_loss(gen_img, gen_z, gen_c, swapping_prob, neural_rendering_resolution, loss='cosine_similarity')
+                id_loss = self.run_id_loss2(gen_img, loss='cosine_similarity')
                 id_loss_scaled = id_loss * id_scale # id scaling
                 loss_Gmain = torch.nn.functional.softplus(-gen_logits)
 
@@ -210,6 +228,7 @@ class StyleGAN2Loss(Loss):
                 training_stats.report('Loss/scores/age', age_loss_scaled)
                 training_stats.report('Loss/scores/id', id_loss_scaled)
                 training_stats.report('Loss/G/loss', loss_Gmain)
+                
             with torch.autograd.profiler.record_function('Gmain_backward'):
                 (loss_Gmain.mean() + (age_loss_scaled) + (id_loss_scaled)).mul(gain).backward() # added age loss and id loss
 
