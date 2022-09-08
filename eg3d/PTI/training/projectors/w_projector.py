@@ -17,12 +17,14 @@ from tqdm import tqdm
 from configs import global_config, hyperparameters
 from utils import log_utils
 import dnnlib
-from camera_utils import LookAtPoseSampler, FOV_to_intrinsics
+from camera_utils import LookAtPoseSampler
+# from camera_utils import LookAtPoseSampler, FOV_to_intrinsics
 
 
 def project(
         G,
         target: torch.Tensor,  # [C,H,W] and dynamic range [0,255], W & H must match G output resolution
+        c,
         *,
         num_steps=1000,
         w_avg_samples=10000,
@@ -51,21 +53,17 @@ def project(
     logprint(f'Computing W midpoint and stddev using {w_avg_samples} samples...')
     z_samples = np.random.RandomState(123).randn(w_avg_samples, G.z_dim)
 
-    intrinsics = FOV_to_intrinsics(18.837, device=device) #default value
-    angle_y, angle_p = (0,-0.2)
-    cam_pivot = torch.tensor(G.rendering_kwargs.get('avg_camera_pivot', [0, 0, 0]), device=device)
-    cam_radius = G.rendering_kwargs.get('avg_camera_radius', 2.7)
-    cam2world_pose = LookAtPoseSampler.sample(np.pi/2 + angle_y, np.pi/2 + angle_p, cam_pivot, radius=cam_radius, device=device)
-    conditioning_cam2world_pose = LookAtPoseSampler.sample(np.pi/2, np.pi/2, cam_pivot, radius=cam_radius, device=device)
-    camera_params = torch.cat([cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)
-    conditioning_params = torch.cat([conditioning_cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)
+    # c = c.clone().repeat(w_avg_samples, 1)
 
-    cuda0 = torch.device('cuda:0')
-    random_age=0.8 #normalized
-    c = torch.cat((conditioning_params, torch.tensor([[random_age]], device=cuda0)), 1).repeat(w_avg_samples,1)
-    c_params = torch.cat((camera_params, torch.tensor([[random_age]], device=cuda0)), 1)
+    camera_lookat_point = torch.tensor(G.rendering_kwargs['avg_camera_pivot'], device=device)
+    cam2world_pose = LookAtPoseSampler.sample(3.14 / 2, 3.14 / 2, camera_lookat_point,
+                                                radius=G.rendering_kwargs['avg_camera_radius'], device=device)
+    focal_length = 4.2647   # FFHQ's FOV
+    intrinsics = torch.tensor([[focal_length, 0, 0.5], [0, focal_length, 0.5], [0, 0, 1]], device=device)
+    c_samples = torch.cat([cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)
+    c_samples = c_samples.repeat(w_avg_samples, 1)
 
-    w_samples = G.mapping(torch.from_numpy(z_samples).to(device), c)  # [N, L, C]
+    w_samples = G.mapping(torch.from_numpy(z_samples).to(device), c_samples)  # [N, L, C]
     w_samples = w_samples[:, :1, :].cpu().numpy().astype(np.float32)  # [N, 1, C]
     w_avg = np.mean(w_samples, axis=0, keepdims=True)  # [1, 1, C]
     w_avg_tensor = torch.from_numpy(w_avg).to(global_config.device)
@@ -112,7 +110,8 @@ def project(
         # Synth images from opt_w.
         w_noise = torch.randn_like(w_opt) * w_noise_scale
         ws = (w_opt + w_noise).repeat([1, G.backbone.mapping.num_ws, 1])
-        synth_images = G.synthesis(ws, c_params, noise_mode='const', force_fp32=True)['image']
+        
+        synth_images = G.synthesis(ws, c, noise_mode='const')['image'] 
 
         # Downsample image to 256x256 if it's larger than that. VGG was built for 224x224 images.
         synth_images = (synth_images + 1) * (255 / 2)

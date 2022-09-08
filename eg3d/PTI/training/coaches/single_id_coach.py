@@ -8,7 +8,8 @@ from utils.log_utils import log_images_from_w
 
 class SingleIDCoach(BaseCoach):
 
-    def __init__(self, data_loader, use_wandb):
+    def __init__(self, c, data_loader, use_wandb):
+        self.c = c
         super().__init__(data_loader, use_wandb)
 
     def train(self):
@@ -36,7 +37,7 @@ class SingleIDCoach(BaseCoach):
                 w_pivot = self.load_inversions(w_path_dir, image_name)
 
             elif not hyperparameters.use_last_w_pivots or w_pivot is None:
-                w_pivot = self.calc_inversions(image, image_name)
+                w_pivot = self.calc_inversions(image, image_name, self.c)
 
             # w_pivot = w_pivot.detach().clone().to(global_config.device)
             w_pivot = w_pivot.to(global_config.device)

@@ -8,6 +8,7 @@ def pre_process_images(
     predictor_path="./networks/align.dat",
     IMAGE_SIZE = 512):
 
+    print("Running preprocess on images...")
     predictor = dlib.shape_predictor(predictor_path)
     print(os.getcwd())
     aligned_images = []

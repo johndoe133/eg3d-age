@@ -14,7 +14,7 @@ from criteria import l2_loss
 from models.e4e.psp import pSp
 from utils.log_utils import log_image_from_w
 from utils.models_utils import toogle_grad, load_old_G
-from camera_utils import LookAtPoseSampler, FOV_to_intrinsics
+# from camera_utils import LookAtPoseSampler, FOV_to_intrinsics
 import numpy as np
 
 
@@ -84,14 +84,14 @@ class BaseCoach:
         self.w_pivots[image_name] = w
         return w
 
-    def calc_inversions(self, image, image_name):
+    def calc_inversions(self, image, image_name, c):
 
         if hyperparameters.first_inv_type == 'w+':
             w = self.get_e4e_inversion(image)
 
         else:
             id_image = torch.squeeze((image.to(global_config.device) + 1) / 2) * 255
-            w = w_projector.project(self.G, id_image, device=torch.device(global_config.device), w_avg_samples=600,
+            w = w_projector.project(self.G, id_image, c, device=torch.device(global_config.device), w_avg_samples=600,
                                     num_steps=hyperparameters.first_inv_steps, w_name=image_name,
                                     use_wandb=self.use_wandb)
 
@@ -129,20 +129,8 @@ class BaseCoach:
 
     def forward(self, w):
         ### Camera params
-        cuda0 = torch.device('cuda:0')
-        intrinsics = FOV_to_intrinsics(18.837, device=cuda0) #default value
-        angle_y, angle_p = (0,-0.2)
-        cam_pivot = torch.tensor(self.G.rendering_kwargs.get('avg_camera_pivot', [0, 0, 0]), device=cuda0)
-        cam_radius = self.G.rendering_kwargs.get('avg_camera_radius', 2.7)
-        cam2world_pose = LookAtPoseSampler.sample(np.pi/2 + angle_y, np.pi/2 + angle_p, cam_pivot, radius=cam_radius, device=cuda0)
-        conditioning_cam2world_pose = LookAtPoseSampler.sample(np.pi/2, np.pi/2, cam_pivot, radius=cam_radius, device=cuda0)
-        camera_params = torch.cat([cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)
-        random_age=0.8
-        c_params = torch.cat((camera_params, torch.tensor([[random_age]], device=cuda0)), 1)
-        
-        generated_images = self.G.synthesis(w,c_params, noise_mode='const', force_fp32=True)
-
-        return generated_images['image']
+        generated_images = self.G.synthesis(w, self.c, noise_mode='const')['image']
+        return generated_images
 
     def initilize_e4e(self):
         ckpt = torch.load(paths_config.e4e, map_location='cpu')
