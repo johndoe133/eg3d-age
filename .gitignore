@@ -42,3 +42,8 @@ eg3d/networks/face_id_model.pt
 eg3d/PTI/embeddings/image/PTI/image/*.pt
 eg3d/PTI/embeddings/*.pt
 
+eg3d/PTI/embeddings/G
+eg3d/PTI/embeddings/w
+eg3d/PTI/image_original/*.png
+eg3d/PTI/image_original/*.jpg
+eg3d/PTI/image_original/

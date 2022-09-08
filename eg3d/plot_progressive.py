@@ -54,10 +54,11 @@ def generate_images(
         pkls = [string for string in os.listdir(network_folder) if '.pkl' in string]
         pkls = sorted(pkls)
         network_pkl = pkls[-1]
+    
+    print("Loading network named:", network_pkl)
     network_pkl = os.path.join(network_folder, network_pkl)
 
     outdir = network_folder
-
     with dnnlib.util.open_url(network_pkl) as f:
         G = legacy.load_network_pkl(f)['G_ema'].to(device)
     
@@ -88,9 +89,8 @@ def generate_images(
 
         
         for age in ages:
-            cuda0 = torch.device('cuda:0')
-            c = torch.cat((conditioning_params, torch.tensor([[age]], device=cuda0)), 1)
-            c_params = torch.cat((camera_params, torch.tensor([[age]], device=cuda0)), 1)
+            c = torch.cat((conditioning_params, torch.tensor([[age]], device=device)), 1)
+            c_params = torch.cat((camera_params, torch.tensor([[age]], device=device)), 1)
             ws = G.mapping(z, c, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff)
             img = G.synthesis(ws, c_params)['image']
 

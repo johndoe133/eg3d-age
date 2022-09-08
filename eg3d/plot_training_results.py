@@ -12,19 +12,19 @@ import json
 @click.option('--figsize', help='Figsize of the image', type=tuple, default=(10,7))
 @click.option('--dpi', help='Dots per image for image', type=int, default=300)
 @click.option('--name', help='Name of the output image', type=str, default="training_results.png")
-
+@click.option('--id', help='If id loss is available', type=bool, default=True)
 def generate_images(
     training_run: str,
     outdir: str,
     figsize: tuple,
     dpi: int,
-    name: str
+    name: str,
+    id: bool,
 ):
     if not(outdir):
         outdir = training_run # save in same folder as training
     
     print(f'Creating plots for training run folder:"{training_run}"...')
-
     #Load data 
     root = './training-runs'
     json_filename = 'stats.jsonl'
@@ -42,8 +42,12 @@ def generate_images(
         r1_penalty.append(data['Loss/r1_penalty']['mean'])
         loss_age.append(data['Loss/scores/age']['mean'])
         loss_age_std.append(data['Loss/scores/age']['std'])
-        loss_id.append(data['Loss/scores/id']['mean'])
-        loss_id_std.append(data['Loss/scores/id']['std'])
+        if id:
+            loss_id.append(data['Loss/scores/id']['mean'])
+            loss_id_std.append(data['Loss/scores/id']['std'])
+        else:
+            loss_id.append(0)
+            loss_id_std.append(0)
         hours.append(data['Timing/total_hours']['mean'])
     
     fid = []

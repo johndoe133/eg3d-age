@@ -5,8 +5,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import json
 
-root = r"./datasets/FFHQ_128"
-path = os.path.join(root, "dataset_original.json")
+root = r"./datasets/FFHQ_512_6_balanced"
+path = os.path.join(root, "dataset_ages.json")
 
 
 ageconfig = r"./networks/age_model/age.prototxt"
@@ -37,13 +37,9 @@ with open(path) as json_file:
     for i, face in enumerate(faces):
         image = face[0]
         c = face[1]
-        img_path = os.path.join(root, image)
-        img = cv2.imread(img_path)
-        img = bgr_to_rgb(img)
-        age = estimate_age(img)
-        age = normalize(age)
+        age = normalize(c[-1])
         ages.append(age)
-        c.append(age)
+        c[-1] = age
         faces_copy.append([image, c])
         if i%10==0:
             print(i)
@@ -63,3 +59,4 @@ plt.title("Age distribution of data set")
 plt.savefig("age_distribution.png")
 with open(os.path.join(root, "dataset-copy.json"), "w") as write_file:
     json.dump(data_copy, write_file)
+
