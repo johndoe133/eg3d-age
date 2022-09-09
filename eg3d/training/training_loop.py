@@ -92,23 +92,25 @@ def save_image_grid(img, fname, drange, grid_size, ages=None):
         img_grid = PIL.Image.fromarray(img[:, :, 0], 'L')
         text_added = ImageDraw.Draw(img_grid)
         if ages:
-            counter = 0
-            for r in range(gh):
-                for c in range(gw):
-                    age = denormalize(ages[counter])
-                    text_added.text((c*H,r*W),str(int(age)), font=font) # untested
-                    counter += 1
+            if not ('raw' in fname or 'depth' in fname):
+                counter = 0
+                for r in range(gh):
+                    for c in range(gw):
+                        age = denormalize(ages[counter])
+                        text_added.text((c*H,r*W),str(int(age)), font=font) # untested
+                        counter += 1
             img_grid.save(fname)
     if C == 3:
         img_grid = PIL.Image.fromarray(img, 'RGB')
         text_added = ImageDraw.Draw(img_grid)
         if ages:
-            counter = 0
-            for r in range(gh):
-                for c in range(gw):
-                    age = denormalize(ages[counter])
-                    text_added.text((c*H,r*W),str(int(age)), font=font) # untested
-                    counter += 1
+            if not ('raw' in fname or 'depth' in fname):
+                counter = 0
+                for r in range(gh):
+                    for c in range(gw):
+                        age = denormalize(ages[counter])
+                        text_added.text((c*H,r*W),str(int(age)), font=font) # untested
+                        counter += 1
             img_grid.save(fname)
 
 #----------------------------------------------------------------------------
@@ -207,8 +209,9 @@ def training_loop(
     abort_fn                = None,     # Callback function for determining whether to abort training. Must return consistent results across ranks.
     progress_fn             = None,     # Callback function for updating training progress. Called for all ranks.
     age_scale               = 1,        # Scales age loss
-    age_loss_fn             = "MSE",     # Age loss function
+    age_loss_fn             = "MSE",    # Age loss function
     id_scale                = 1,        # Scales ID loss
+    batch_division          = True,     # Batch size remains the same but the IDs in the batch is halfed and the remaining are then duplicated. 
 ):
     # Initialize.
     start_time = time.time()
@@ -349,16 +352,24 @@ def training_loop(
             phase_real_img = (phase_real_img.to(device).to(torch.float32) / 127.5 - 1).split(batch_gpu)
             phase_real_c = phase_real_c.to(device).split(batch_gpu)
             # all_gen_z = torch.randn([len(phases) * batch_size, G.z_dim], device=device)
-            all_gen_z = torch.randn([len(phases) * batch_size//2, G.z_dim], device=device)
-            all_gen_z = torch.repeat_interleave(all_gen_z, 2, dim=0) # repeat latent codes 
-            all_gen_z = [phase_gen_z.split(batch_gpu) for phase_gen_z in all_gen_z.split(batch_size)]
-            all_gen_c = [training_set.get_label(np.random.randint(len(training_set))) for _ in range(len(phases) * batch_size//2)]
-            all_gen_c_new = []
-            for element in all_gen_c: # repeat each element
-                all_gen_c_new.append(element)
-                all_gen_c_new.append(element)
-            # replace age sampled from dataset.json with generated age between range
-            all_gen_c = [np.concatenate([gen_c_initial[:-1], generate_age(5, 80)]) for gen_c_initial in all_gen_c_new]
+            if batch_division:
+                all_gen_z = torch.randn([len(phases) * batch_size//2, G.z_dim], device=device)
+                all_gen_z = torch.repeat_interleave(all_gen_z, 2, dim=0) # repeat latent codes 
+                all_gen_z = [phase_gen_z.split(batch_gpu) for phase_gen_z in all_gen_z.split(batch_size)]
+                all_gen_c = [training_set.get_label(np.random.randint(len(training_set))) for _ in range(len(phases) * batch_size//2)]
+                all_gen_c_new = []
+                for element in all_gen_c: # repeat each element
+                    all_gen_c_new.append(element)
+                    all_gen_c_new.append(element)
+                # replace age sampled from dataset.json with generated age between range
+                all_gen_c = [np.concatenate([gen_c_initial[:-1], generate_age(5, 80)]) for gen_c_initial in all_gen_c_new]
+            else:
+                all_gen_z = torch.randn([len(phases) * batch_size, G.z_dim], device=device)
+                all_gen_z = [phase_gen_z.split(batch_gpu) for phase_gen_z in all_gen_z.split(batch_size)]
+                all_gen_c = [training_set.get_label(np.random.randint(len(training_set))) for _ in range(len(phases) * batch_size)]
+                # replace age sampled from dataset.json with generated age between range
+                all_gen_c = [np.concatenate([gen_c_initial[:-1], generate_age(5, 80)]) for gen_c_initial in all_gen_c]
+                
             all_gen_c = torch.from_numpy(np.stack(all_gen_c)).pin_memory().to(device)
             all_gen_c = all_gen_c.float() # needed
             all_gen_c = [phase_gen_c.split(batch_gpu) for phase_gen_c in all_gen_c.split(batch_size)]
