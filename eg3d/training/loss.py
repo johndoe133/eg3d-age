@@ -19,7 +19,7 @@ from torch_utils.ops import upfirdn2d
 from training.dual_discriminator import filtered_resizing
 from networks.DEX.estimate_age import AgeEstimator2
 import time
-from training.face_id import InceptionResnetV1
+from training.face_id import FaceIDLoss
 import random
 
 #----------------------------------------------------------------------------
@@ -61,7 +61,8 @@ class StyleGAN2Loss(Loss):
         self.age_loss_MSE = torch.nn.MSELoss()
         self.age_loss_L1 = torch.nn.L1Loss()
         self.cosine_sim = torch.nn.CosineSimilarity()
-        self.id_model = InceptionResnetV1(pretrained='vggface2', device=device).requires_grad_(requires_grad=False).eval()
+        self.id_model = FaceIDLoss(device)
+        # self.id_model = InceptionResnetV1(pretrained='vggface2', device=device).requires_grad_(requires_grad=False).eval()
         assert self.gpc_reg_prob is None or (0 <= self.gpc_reg_prob <= 1)
 
 
@@ -98,12 +99,12 @@ class StyleGAN2Loss(Loss):
         a = iter(iterable)
         return zip(a, a)
 
-    def run_id_loss2(self, imgs, loss='MSE'):
+    def run_id_loss2(self, imgs, gen_z, gen_c, loss='MSE'):
         images = imgs['image']
         total_loss = 0
         for img1, img2 in self.pairwise(images): # every pair should have the same latent code and same c except for the age parameter
-            latent_coords_1 = self.id_model(img1[None, :, :, :]) # to get the proper shape of [1, C, W, H] and not [C, W, H]
-            latent_coords_2 = self.id_model(img2[None, :, :, :])
+            latent_coords_1 = self.id_model.get_feature_vector(img1[None, :, :, :]) # to get the proper shape of [1, C, W, H] and not [C, W, H]
+            latent_coords_2 = self.id_model.get_feature_vector(img2[None, :, :, :])
             constant = 1e-8
             cos = 1 + self.cosine_sim(latent_coords_1, latent_coords_2) + constant
             loss = - torch.log10(cos) + torch.log10(torch.tensor([2 + constant], device=self.device))
@@ -154,6 +155,7 @@ class StyleGAN2Loss(Loss):
         if swapping_prob is not None:
             c_swapped = torch.roll(c.clone(), 1, 0)
             c_gen_conditioning = torch.where(torch.rand((c.shape[0], 1), device=c.device) < swapping_prob, c_swapped, c)
+            # will swap the items in the c vector if the torch.rand is greater than swapping_prob
         else:
             c_gen_conditioning = torch.zeros_like(c)
 
@@ -219,7 +221,7 @@ class StyleGAN2Loss(Loss):
                 age_loss = self.run_age_loss(gen_img, gen_c, loss=age_loss_fn)
                 age_loss_scaled = age_loss * age_scale # age scaling
                 # id_loss = self.run_id_loss(gen_img, gen_z, gen_c, swapping_prob, neural_rendering_resolution, loss='cosine_similarity')
-                id_loss = self.run_id_loss2(gen_img, loss='cosine_similarity')
+                id_loss = self.run_id_loss2(gen_img, gen_z, gen_c, loss='cosine_similarity')
                 id_loss_scaled = id_loss * id_scale # id scaling
                 loss_Gmain = torch.nn.functional.softplus(-gen_logits)
 
