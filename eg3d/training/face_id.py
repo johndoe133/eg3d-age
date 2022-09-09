@@ -24,6 +24,35 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
+class FaceIDLoss:
+    def __init__(self, device, resize_img = True, resize_shape = 160):
+        self.id_model = InceptionResnetV1(pretrained='vggface2', device=device).requires_grad_(requires_grad=False).eval()
+        self.resize_img = resize_img
+        self.resize_shape = resize_shape
+
+    def get_feature_vector(self, img):
+        if self.resize_img:
+            img_resize = self.resize(img)
+        img_RGB = self.transform_to_RGB(img_resize)
+        feature_vector = self.id_model(img_RGB)
+        return feature_vector
+
+    def transform_to_RGB(self, img):
+        lo, hi = torch.min(img).item(), torch.max(img).item() 
+        # adjust pixel values to 0 - 255
+        img255 = (img - lo) * (255 / (hi - lo))
+        return img255.floor()
+
+    def resize(self, img):
+        """Resize image tensor to fit age model
+
+        Args:
+            img (tensor): 
+
+        Returns:
+            tensor: resized tensor
+        """
+        return F.interpolate(img, [self.resize_shape, self.resize_shape],  mode='bilinear', align_corners=True)    
 
 class BasicConv2d(nn.Module):
 
