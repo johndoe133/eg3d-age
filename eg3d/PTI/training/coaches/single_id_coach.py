@@ -4,12 +4,13 @@ from tqdm import tqdm
 from configs import paths_config, hyperparameters, global_config
 from training.coaches.base_coach import BaseCoach
 from utils.log_utils import log_images_from_w
-
+import re
 
 class SingleIDCoach(BaseCoach):
 
-    def __init__(self, c, data_loader, use_wandb):
+    def __init__(self, c, image_name, data_loader, use_wandb):
         self.c = c
+        self.image_name = image_name
         super().__init__(data_loader, use_wandb)
 
     def train(self):
@@ -21,6 +22,8 @@ class SingleIDCoach(BaseCoach):
         use_ball_holder = True
 
         for fname, image in tqdm(self.data_loader):
+            if fname[0] != self.image_name: 
+                continue # dont train on the images that is not specified
             image_name = fname[0]
 
             self.restart_training()

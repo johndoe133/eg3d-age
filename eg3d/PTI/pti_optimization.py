@@ -29,7 +29,7 @@ device = torch.device('cuda')
 
 age=0.8
 
-def run(age, model_path):
+def run(age, model_path, image_name):
     paths_config.stylegan2_ada_ffhq = model_path
     ## CONDITIONS - parameter needs changing IF we train with other parameters
     fov_deg = 4.2647 # 18.837 # might be that 4.2647   # FFHQ's FOV
@@ -51,12 +51,14 @@ def run(age, model_path):
     c = conditioning_params
     c_params = camera_params
 
-    c = np.array([0.9422833919525146, 0.034289587289094925, 0.3330560326576233, -0.8367999667889383, 0.03984849900007248, -0.9991570711135864, -0.009871904738247395, 0.017018394869192363, 0.33243677020072937, 0.022573914378881454, -0.9428553581237793, 2.566997504832856, 0.0, 0.0, 0.0, 1.0, 4.2647, 0.0, 0.5, 0.0, 4.2647, 0.5, 0.0, 0.0, 1.0])#, -0.4627])
+    # c = np.array([0.9999064803123474, -0.006213949993252754, -0.012183905579149723, 0.028693876930960493, -0.0060052573680877686, -0.9998359084129333, 0.017090922221541405, -0.04020780808014847, -0.012288108468055725, -0.017016155645251274, -0.9997797012329102, 2.6995481091464293, 0.0, 0.0, 0.0, 1.0, 4.2647, 0.0, 0.5, 0.0, 4.2647, 0.5, 0.0, 0.0, 1.0]) #, -0.4627]
+    c = np.array([0.9979292154312134, -0.004497078713029623, 0.06416412442922592, -0.1661906628986501, -0.00316850608214736, -0.9997788071632385, -0.020792603492736816, 0.06072389919955754, 0.06424344331026077, 0.020546242594718933, -0.9977227449417114, 2.694196219957134, 0.0, 0.0, 0.0, 1.0, 4.2647, 0.0, 0.5, 0.0, 4.2647, 0.5, 0.0, 0.0, 1.0])
     c = np.reshape(c, (1, 25))
     c = torch.FloatTensor(c).cuda()
 
     print("Running PTI optimization...")
-    model_id = run_PTI(c, use_wandb=False, use_multi_id_training=False)
+    model_id = run_PTI(c, image_name, use_wandb=False, use_multi_id_training=False)
+    
     print("Finished running PTI optimization")
 
 if __name__ == "__main__":
