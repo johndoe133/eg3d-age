@@ -54,8 +54,10 @@ class FaceIDLoss:
         """
         return F.interpolate(img, [self.resize_shape, self.resize_shape],  mode='bilinear', align_corners=True)    
 
-class BasicConv2d(nn.Module):
+    def get_loss(self, latent_chords, new_latent_chords):
+        pass
 
+class BasicConv2d(nn.Module):
     def __init__(self, in_planes, out_planes, kernel_size, stride, padding=0):
         super().__init__()
         self.conv = nn.Conv2d(

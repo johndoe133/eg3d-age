@@ -112,10 +112,10 @@ class StyleGAN2Loss(Loss):
 
         return total_loss
     def run_id_loss(self, imgs, z, c, swapping_prob, neural_rendering_resolution, margin=0.2, loss='MSE'):
-        """Returns the identity loss of a subject by comparing the given images to the images aged and young-ified. 
+        """Returns the identity loss of a subject by comparing the given images to the 
+        images aged and young-ified. 
         
         """
-
         images = imgs['image']
         ages = c[:,-1].clone()
         # bins = np.linspace(-1, 1, bins)
@@ -132,19 +132,20 @@ class StyleGAN2Loss(Loss):
 
         new_c = c.clone()
         new_c[:,-1] = torch.tensor(random_ages)
-        with torch.no_grad():
-            gen_img, _ = self.run_G(z, new_c, swapping_prob=swapping_prob, neural_rendering_resolution=neural_rendering_resolution)
+        with torch.no_grad(): # skal det være no_grad? og swapping_prob=0
+            gen_img, _ = self.run_G(z, new_c, swapping_prob=0, neural_rendering_resolution=neural_rendering_resolution)
         new_images = gen_img['image']
 
-        latent_coords = self.id_model(images)
-        new_latent_coords = self.id_model(new_images)
-
+        latent_coords = self.id_model.get_feature_vector(images)
+        new_latent_coords = self.id_model.get_feature_vector(new_images)
+        
         if loss=='MSE':
             return self.age_loss_MSE(latent_coords, new_latent_coords)
         elif loss == 'cosine_similarity':
             constant = 1e-8
             cos = 1 + self.cosine_sim(latent_coords, new_latent_coords) + constant
-            l = - torch.log10(cos) + torch.log10(torch.tensor([2 + constant], device=self.device))
+            l = - torch.tensor([10], device=self.device) * cos + torch.tensor([20], device=self.device) # linear loss
+            # l = - torch.tensor(cos) + torch.log10(torch.tensor([2 + constant], device=self.device))
             return l.mean()
         else:
             raise NotImplementedError
@@ -185,7 +186,7 @@ class StyleGAN2Loss(Loss):
         logits = self.D(img, c, update_emas=update_emas)
         return logits
 
-    def accumulate_gradients(self, phase, real_img, real_c, gen_z, gen_c, gain, cur_nimg, age_scale=1, age_loss_fn="MSE", id_scale = 1):
+    def accumulate_gradients(self, phase, real_img, real_c, gen_z, gen_c, gain, cur_nimg, age_scale=1, age_loss_fn="MSE", id_scale = 1, batch_division=False):
         assert phase in ['Gmain', 'Greg', 'Gboth', 'Dmain', 'Dreg', 'Dboth']
         if self.G.rendering_kwargs.get('density_reg', 0) == 0:
             phase = {'Greg': 'none', 'Gboth': 'Gmain'}.get(phase, phase)
@@ -220,8 +221,11 @@ class StyleGAN2Loss(Loss):
                 gen_logits = self.run_D(gen_img, gen_c, blur_sigma=blur_sigma)
                 age_loss = self.run_age_loss(gen_img, gen_c, loss=age_loss_fn)
                 age_loss_scaled = age_loss * age_scale # age scaling
-                # id_loss = self.run_id_loss(gen_img, gen_z, gen_c, swapping_prob, neural_rendering_resolution, loss='cosine_similarity')
-                id_loss = self.run_id_loss2(gen_img, gen_z, gen_c, loss='cosine_similarity')
+                
+                if not batch_division:
+                    id_loss = self.run_id_loss(gen_img, gen_z, gen_c, swapping_prob, neural_rendering_resolution, loss='cosine_similarity', margin=0.2)
+                else:
+                    id_loss = self.run_id_loss2(gen_img, gen_z, gen_c, loss='cosine_similarity')
                 id_loss_scaled = id_loss * id_scale # id scaling
                 loss_Gmain = torch.nn.functional.softplus(-gen_logits)
 
