@@ -8,7 +8,7 @@ from criteria.localitly_regulizer import Space_Regulizer
 import torch
 from torchvision import transforms
 from lpips import LPIPS
-from training.projectors import w_projector
+from training.projectors import w_projector, z_projector
 from configs import global_config, paths_config, hyperparameters
 from criteria import l2_loss
 from models.e4e.psp import pSp
@@ -91,11 +91,11 @@ class BaseCoach:
 
         else:
             id_image = torch.squeeze((image.to(global_config.device) + 1) / 2) * 255
-            w = w_projector.project(self.G, id_image, c, image_name, device=torch.device(global_config.device), w_avg_samples=600,
+            z = z_projector.project(self.G, id_image, c, image_name, device=torch.device(global_config.device), z_avg_samples=600,
                                     num_steps=hyperparameters.first_inv_steps, w_name=image_name,
                                     use_wandb=self.use_wandb)
 
-        return w
+        return z
 
     @abc.abstractmethod
     def train(self):
@@ -127,8 +127,9 @@ class BaseCoach:
 
         return loss, l2_loss_val, loss_lpips
 
-    def forward(self, w):
+    def forward(self, z):
         ### Camera params
+        w = self.G.mapping(z, self.c)
         generated_images = self.G.synthesis(w, self.c, noise_mode='const')['image']
         return generated_images
 

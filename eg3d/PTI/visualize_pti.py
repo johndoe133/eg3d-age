@@ -27,7 +27,7 @@ def visualize(image_name, c):
     old_G, new_G = load_generators(image_name)
 
     embedding_dir_w = './PTI/embeddings/w'
-    w_pivot = torch.load(f'{embedding_dir_w}/{image_name}.pt')
+    z_pivot = torch.load(f'{embedding_dir_w}/{image_name}.pt')
 
 
     # cuda0 = torch.device('cuda:0')
@@ -44,8 +44,10 @@ def visualize(image_name, c):
 
     # old_image = old_G.synthesis(w_pivot, c_params, noise_mode='const', force_fp32 = True)['image']
     # new_image = new_G.synthesis(w_pivot, c_params, noise_mode='const', force_fp32 = True)['image']
+    w_pivot_old = old_G.mapping(z_pivot, c)
+    old_image = old_G.synthesis(w_pivot_old, c, noise_mode='const', force_fp32 = True)['image']
 
-    old_image = old_G.synthesis(w_pivot, c, noise_mode='const', force_fp32 = True)['image']
+    w_pivot = new_G.mapping(z_pivot, c)
     new_image = new_G.synthesis(w_pivot, c, noise_mode='const', force_fp32 = True)['image']
 
     images = [old_image, new_image]

@@ -30,7 +30,7 @@ def project(
         image_name,
         *,
         num_steps=1000,
-        w_avg_samples=10000,
+        z_avg_samples=10000,
         initial_learning_rate=0.01,
         initial_noise_factor=0.05,
         lr_rampdown_length=0.25,
@@ -40,7 +40,7 @@ def project(
         verbose=False,
         device: torch.device,
         use_wandb=False,
-        initial_w=None,
+        initial_z=None,
         image_log_step=global_config.image_rec_result_log_snapshot,
         w_name: str
 ):
@@ -53,27 +53,20 @@ def project(
     G = copy.deepcopy(G).eval().requires_grad_(False).to(device).float()  # type: ignore
 
     # Compute w stats.
-    logprint(f'Computing W midpoint and stddev using {w_avg_samples} samples...')
-    z_samples = np.random.RandomState(123).randn(w_avg_samples, G.z_dim)
+    logprint(f'Computing W midpoint and stddev using {z_avg_samples} samples...')
+    z_samples = np.random.RandomState(123).randn(z_avg_samples, G.z_dim) # size (600, 512)
+    z_avg = np.mean(z_samples, axis = 0)
+    z_std = (np.sum((z_samples - z_avg) ** 2) / z_avg_samples) ** 0.5 # scalar
+    c_repeat = c.repeat(z_avg_samples, 1) # 600, 26
 
-    # c = c.clone().repeat(w_avg_samples, 1)
 
-    # camera_lookat_point = torch.tensor(G.rendering_kwargs['avg_camera_pivot'], device=device)
-    # cam2world_pose = LookAtPoseSampler.sample(3.14 / 2, 3.14 / 2, camera_lookat_point,
-    #                                             radius=G.rendering_kwargs['avg_camera_radius'], device=device)
-    # focal_length = 4.2647   # FFHQ's FOV
-    # intrinsics = torch.tensor([[focal_length, 0, 0.5], [0, focal_length, 0.5], [0, 0, 1]], device=device)
-    # camera_params = torch.cat([cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)
-    # camera_params = camera_params.repeat(w_avg_samples, 1)
-
-    c_repeat = c.repeat(w_avg_samples, 1) # 600, 26
     w_samples = G.mapping(torch.from_numpy(z_samples).to(device), c_repeat)  # [N, L, C] torch.Size([600, 14, 512])
     w_samples = w_samples[:, :1, :].cpu().numpy().astype(np.float32)  # [N, 1, C] (600, 1, 512)
     w_avg = np.mean(w_samples, axis=0, keepdims=True)  # [1, 1, C] shape (1, 1, 512)
     w_avg_tensor = torch.from_numpy(w_avg).to(global_config.device) 
-    w_std = (np.sum((w_samples - w_avg) ** 2) / w_avg_samples) ** 0.5 # scalar
+    w_std = (np.sum((w_samples - w_avg) ** 2) / z_avg_samples) ** 0.5 # scalar
 
-    start_w = initial_w if initial_w is not None else w_avg
+    start_z = initial_z if initial_z is not None else z_avg
     # start_w size=(1,1,512)
     # Setup noise inputs.
     noise_bufs = {name: buf for (name, buf) in G.backbone.synthesis.named_buffers() if 'noise_const' in name}
@@ -89,11 +82,11 @@ def project(
     if target_images.shape[2] > 256:
         target_images = F.interpolate(target_images, size=(256, 256), mode='area') # torch.Size([1, 3, 256, 256])
     target_features = vgg16(target_images, resize_images=False, return_lpips=True)
-
-    w_opt = torch.tensor(start_w, dtype=torch.float32, device=device, requires_grad=True)  # torch.Size([1, 1, 512])
-                         # pylint: disable=not-callable
-    optimizer = torch.optim.Adam([w_opt] + list(noise_bufs.values()), betas=(0.9, 0.999),
-                                 lr=hyperparameters.first_inv_lr)
+    start_z = start_z[None, :] # [1,512]
+    z_opt = torch.tensor(start_z, dtype=torch.float32, device=device, requires_grad=True)  # torch.Size([512])
+                            # pylint: disable=not-callable
+    optimizer = torch.optim.Adam([z_opt] + list(noise_bufs.values()), betas=(0.9, 0.999),
+                                    lr=hyperparameters.first_inv_lr)
 
     # Init noise.
     for buf in noise_bufs.values():
@@ -104,7 +97,7 @@ def project(
 
         # Learning rate schedule.
         t = step / num_steps
-        w_noise_scale = w_std * initial_noise_factor * max(0.0, 1.0 - t / noise_ramp_length) ** 2
+        z_noise_scale = z_std * initial_noise_factor * max(0.0, 1.0 - t / noise_ramp_length) ** 2
         lr_ramp = min(1.0, (1.0 - t) / lr_rampdown_length)
         lr_ramp = 0.5 - 0.5 * np.cos(lr_ramp * np.pi)
         lr_ramp = lr_ramp * min(1.0, t / lr_rampup_length)
@@ -113,11 +106,11 @@ def project(
             param_group['lr'] = lr
 
         # Synth images from opt_w.
-        w_noise = torch.randn_like(w_opt) * w_noise_scale # torch.Size([1, 1, 512])
-        ws = (w_opt + w_noise).repeat([1, G.backbone.mapping.num_ws, 1]) # torch.Size([1, 14, 512])
+        z_noise = torch.randn_like(z_opt) * z_noise_scale
+        zs = (z_opt + z_noise) #.repeat([G.backbone.mapping.num_ws, 1])
         
-        synth_images = G.synthesis(ws, c, noise_mode='const')['image']  #torch.Size([1, 3, 512, 512])
-
+        ws = G.mapping(zs, c)
+        synth_images = G.synthesis(ws, c, noise_mode='const')['image'] 
 
         # Downsample image to 256x256 if it's larger than that. VGG was built for 224x224 images.
         synth_images = (synth_images + 1) * (255 / 2)
@@ -149,7 +142,7 @@ def project(
                 if use_wandb:
                     global_config.training_step += 1
                     wandb.log({f'first projection _{w_name}': loss.detach().cpu()}, step=global_config.training_step)
-                    log_utils.log_image_from_w(w_opt.repeat([1, G.backbone.mapping.num_ws, 1]), G, w_name)
+                    # log_utils.log_image_from_w(w_opt.repeat([1, G.backbone.mapping.num_ws, 1]), G, w_name)
 
         # Step
         optimizer.zero_grad(set_to_none=True)
@@ -173,4 +166,4 @@ def project(
 
     G_map_num_ws = G.backbone.mapping.num_ws
     del G
-    return w_opt.repeat([1, G_map_num_ws, 1])
+    return z_opt
