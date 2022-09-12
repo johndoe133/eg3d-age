@@ -31,15 +31,15 @@ def pti_pipeline(
 ):
     hyperparameters.first_inv_steps = w_iterations
     hyperparameters.max_pti_steps = pti_iterations
-    
+
     age = normalize(age)
 
     if preprocess:
         pre_process_images()
 
-    run(age, model_path, image_name)
+    c = run(age, model_path, image_name)
 
-    visualize(image_name)
+    visualize(image_name, c)
 
     print(f"See output in folder eg3d/PTI/output/{image_name}")
 

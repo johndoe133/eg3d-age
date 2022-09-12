@@ -91,7 +91,7 @@ class BaseCoach:
 
         else:
             id_image = torch.squeeze((image.to(global_config.device) + 1) / 2) * 255
-            w = w_projector.project(self.G, id_image, c, device=torch.device(global_config.device), w_avg_samples=600,
+            w = w_projector.project(self.G, id_image, c, image_name, device=torch.device(global_config.device), w_avg_samples=600,
                                     num_steps=hyperparameters.first_inv_steps, w_name=image_name,
                                     use_wandb=self.use_wandb)
 

@@ -18,6 +18,8 @@ from configs import global_config, hyperparameters
 from utils import log_utils
 import dnnlib
 from camera_utils import LookAtPoseSampler
+from PIL import Image
+import os
 # from camera_utils import LookAtPoseSampler, FOV_to_intrinsics
 
 
@@ -25,6 +27,7 @@ def project(
         G,
         target: torch.Tensor,  # [C,H,W] and dynamic range [0,255], W & H must match G output resolution
         c,
+        image_name,
         *,
         num_steps=1000,
         w_avg_samples=10000,
@@ -55,15 +58,16 @@ def project(
 
     # c = c.clone().repeat(w_avg_samples, 1)
 
-    camera_lookat_point = torch.tensor(G.rendering_kwargs['avg_camera_pivot'], device=device)
-    cam2world_pose = LookAtPoseSampler.sample(3.14 / 2, 3.14 / 2, camera_lookat_point,
-                                                radius=G.rendering_kwargs['avg_camera_radius'], device=device)
-    focal_length = 4.2647   # FFHQ's FOV
-    intrinsics = torch.tensor([[focal_length, 0, 0.5], [0, focal_length, 0.5], [0, 0, 1]], device=device)
-    c_samples = torch.cat([cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)
-    c_samples = c_samples.repeat(w_avg_samples, 1)
+    # camera_lookat_point = torch.tensor(G.rendering_kwargs['avg_camera_pivot'], device=device)
+    # cam2world_pose = LookAtPoseSampler.sample(3.14 / 2, 3.14 / 2, camera_lookat_point,
+    #                                             radius=G.rendering_kwargs['avg_camera_radius'], device=device)
+    # focal_length = 4.2647   # FFHQ's FOV
+    # intrinsics = torch.tensor([[focal_length, 0, 0.5], [0, focal_length, 0.5], [0, 0, 1]], device=device)
+    # camera_params = torch.cat([cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)
+    # camera_params = camera_params.repeat(w_avg_samples, 1)
 
-    w_samples = G.mapping(torch.from_numpy(z_samples).to(device), c_samples)  # [N, L, C]
+    c_repeat = c.repeat(w_avg_samples, 1)
+    w_samples = G.mapping(torch.from_numpy(z_samples).to(device), c_repeat)  # [N, L, C]
     w_samples = w_samples[:, :1, :].cpu().numpy().astype(np.float32)  # [N, 1, C]
     w_avg = np.mean(w_samples, axis=0, keepdims=True)  # [1, 1, C]
     w_avg_tensor = torch.from_numpy(w_avg).to(global_config.device)
@@ -94,7 +98,7 @@ def project(
     for buf in noise_bufs.values():
         buf[:] = torch.randn_like(buf)
         buf.requires_grad = True
-
+    images = []
     for step in tqdm(range(num_steps)):
 
         # Learning rate schedule.
@@ -113,10 +117,15 @@ def project(
         
         synth_images = G.synthesis(ws, c, noise_mode='const')['image'] 
 
+
         # Downsample image to 256x256 if it's larger than that. VGG was built for 224x224 images.
         synth_images = (synth_images + 1) * (255 / 2)
         if synth_images.shape[2] > 256:
             synth_images = F.interpolate(synth_images, size=(256, 256), mode='area')
+
+        if step % 50 == 0 or step==num_steps: # append to save images
+            save_img = (synth_images.permute(0, 2, 3, 1)).clamp(0, 255).to(torch.uint8)
+            images.append(save_img)
 
         # Features for synth images.
         synth_features = vgg16(synth_images, resize_images=False, return_lpips=True)
@@ -152,6 +161,14 @@ def project(
             for buf in noise_bufs.values():
                 buf -= buf.mean()
                 buf *= buf.square().mean().rsqrt()
+
+    # save progress image
+    home_dir = os.path.expanduser('~')
+    path = f"Documents/eg3d-age/eg3d/PTI/output/{image_name}"
+    save_name = os.path.join(home_dir, path, "optimization.png")
+    img = torch.cat(images, dim=2)
+    Image.fromarray(img[0].cpu().numpy(), 'RGB').save(save_name)
+
 
     G_map_num_ws = G.backbone.mapping.num_ws
     del G
