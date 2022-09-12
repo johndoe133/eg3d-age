@@ -132,8 +132,9 @@ class StyleGAN2Loss(Loss):
 
         new_c = c.clone()
         new_c[:,-1] = torch.tensor(random_ages)
-        with torch.no_grad(): # skal det være no_grad? og swapping_prob=0
-            gen_img, _ = self.run_G(z, new_c, swapping_prob=0, neural_rendering_resolution=neural_rendering_resolution)
+        # with torch.no_grad(): # skal det være no_grad? og swapping_prob=0
+        
+        gen_img, _ = self.run_G(z, new_c, swapping_prob=0, neural_rendering_resolution=neural_rendering_resolution)
         new_images = gen_img['image']
 
         latent_coords = self.id_model.get_feature_vector(images)
