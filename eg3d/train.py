@@ -195,7 +195,7 @@ def parse_comma_separated_list(s):
 @click.option('--age_scale',    help='Scales age loss.', metavar='FLOAT', default=1.0, required=False, show_default=True)
 @click.option('--id_scale',    help='Scales id loss.', metavar='FLOAT', default=10.0, required=False, show_default=True)
 @click.option('--age_loss_fn',    help='Type of age loss function', metavar='STR', default="MSE", required=False)
-@click.option('--batch_division', help='If batch should be divided in half and doubled again so that there is two of each id', metavar='BOOL', default=True, required=False)
+@click.option('--batch_division', help='If batch should be divided in half and doubled again so that there is two of each id', metavar='BOOL', default=False, required=False)
 
 
 def main(**kwargs):
