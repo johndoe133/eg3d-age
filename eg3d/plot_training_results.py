@@ -86,7 +86,10 @@ def generate_images(
     ## ID LOSS ##
     axs2 = fig.add_subplot(3,2,2)
     axs2.plot(x, loss_id, label="Loss")
-    id_loss_ylim = max(loss_id + loss_id_std)
+    if id:
+        id_loss_ylim = max(loss_id + loss_id_std)
+    else:
+        id_loss_ylim = 1
     axs2.set_ylabel("ID loss")
     axs2.set_ylim(0, id_loss_ylim*1.05)
     axs2.fill_between(x, loss_id - loss_id_std, loss_id + loss_id_std, alpha=0.4, label="std")
