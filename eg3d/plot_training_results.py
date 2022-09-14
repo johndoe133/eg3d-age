@@ -93,6 +93,7 @@ def generate_images(
     plot_path = os.path.join(root, outdir, plot_name)
     plt.tight_layout()
     fig.savefig(plot_path)
+    print(f'saved figure to {plot_path}')
 
     print("Ending program...")
 
