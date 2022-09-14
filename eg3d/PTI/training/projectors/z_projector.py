@@ -159,9 +159,10 @@ def project(
     # save progress image
     home_dir = os.path.expanduser('~')
     path = f"Documents/eg3d-age/eg3d/PTI/output/{image_name}"
-    save_name = os.path.join(home_dir, path, "optimization.png")
+    save_name = os.path.join(home_dir, path)
+    os.makedirs(save_name, exist_ok=True)
     img = torch.cat(images, dim=2)
-    Image.fromarray(img[0].cpu().numpy(), 'RGB').save(save_name)
+    Image.fromarray(img[0].cpu().numpy(), 'RGB').save(save_name + "/initial_optimization.png")
 
 
     G_map_num_ws = G.backbone.mapping.num_ws

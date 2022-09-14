@@ -11,7 +11,7 @@ import torch
 from tqdm import tqdm
 import mrcfile
 
-from networks.DEX.estimate_age import AgeEstimator2
+from networks.DEX.estimate_age import AgeEstimator
 import legacy
 from camera_utils import LookAtPoseSampler, FOV_to_intrinsics
 from torch_utils import misc

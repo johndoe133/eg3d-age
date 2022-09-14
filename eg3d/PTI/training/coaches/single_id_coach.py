@@ -4,7 +4,7 @@ from tqdm import tqdm
 from configs import paths_config, hyperparameters, global_config
 from training.coaches.base_coach import BaseCoach
 from utils.log_utils import log_images_from_w
-import re
+from PIL import Image
 
 class SingleIDCoach(BaseCoach):
 
@@ -48,16 +48,22 @@ class SingleIDCoach(BaseCoach):
             torch.save(z_pivot, f'{embedding_dir}/{image_name}.pt')
             log_images_counter = 0
             real_images_batch = image.to(global_config.device)
-
+            images = []
             for i in tqdm(range(hyperparameters.max_pti_steps)):
 
                 generated_images = self.forward(z_pivot)
                 loss, l2_loss_val, loss_lpips = self.calc_loss(generated_images, real_images_batch, image_name,
                                                                self.G, use_ball_holder, w_pivot)
+                # save progress
+                if i%50==0:
+                    save_img = (generated_images.permute(0, 2, 3, 1)* 127.5 + 128).clamp(0, 255).to(torch.uint8)
+                    images.append(save_img)
 
                 self.optimizer.zero_grad()
 
                 if loss_lpips <= hyperparameters.LPIPS_value_threshold:
+                    save_img = (generated_images.permute(0, 2, 3, 1)* 127.5 + 128).clamp(0, 255).to(torch.uint8)
+                    images.append(save_img)
                     break
 
                 loss.backward()
@@ -77,3 +83,10 @@ class SingleIDCoach(BaseCoach):
             model_name = os.path.join(model_path, f'{image_name}.pt')
             torch.save(self.G,
                        model_name)
+
+            # save image
+            home_dir = os.path.expanduser('~')
+            path = f"Documents/eg3d-age/eg3d/PTI/output/{image_name}"
+            save_name = os.path.join(home_dir, path, "pti_optimization.png")
+            img = torch.cat(images, dim=2)
+            Image.fromarray(img[0].cpu().numpy(), 'RGB').save(save_name)

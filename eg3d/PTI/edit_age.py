@@ -5,6 +5,7 @@ import pickle
 import numpy as np
 import torch
 import torch.nn.functional as F
+import os
 from PIL import Image
 
 def normalize(x, rmin = 5, rmax = 80, tmin = -1, tmax = 1):
@@ -39,5 +40,8 @@ def edit_age(image_name, model_path, c):
         # F.interpolate(img.float(), [224,224],  mode='bilinear', align_corners=True).shape
         images.append(img)
     images = torch.cat(images, dim=2)
-    Image.fromarray(images[0].cpu().numpy(), 'RGB').save(f'bitch.png')
+    home_dir = os.path.expanduser('~')
+    path = f"Documents/eg3d-age/eg3d/PTI/output/{image_name}"
+    save_name = os.path.join(home_dir, path, "aging_effect.png")
+    Image.fromarray(images[0].cpu().numpy(), 'RGB').save(save_name)
     return img
