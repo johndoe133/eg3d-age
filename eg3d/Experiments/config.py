@@ -1,7 +1,7 @@
 template_text = """
 #!/bin/sh
 ### General options
-export CUDA_VISIBLE_DEVICES={devices}
+### export CUDA_VISIBLE_DEVICES={devices}
 
 ### -- specify queue --
 #BSUB -q {queue_name}
@@ -13,7 +13,7 @@ export CUDA_VISIBLE_DEVICES={devices}
 #BSUB -n 8
 
 ### -- Select the resources: {gpu_num} gpus -- 
-#BSUB -gpu "num={gpu_num}"
+#BSUB -gpu "num={gpu_num}:mode=shared:j_exclusive=yes"
 
 ### -- set walltime limit: hh:mm --  maximum 24 hours for GPU-queues right now
 #BSUB -W 24:00
@@ -32,8 +32,9 @@ export CUDA_VISIBLE_DEVICES={devices}
 ### -- Specify the output and error file. %J is the job-id --
 ### -- -o and -e mean append, -oo and -eo mean overwrite --
 
-#BSUB -oo {logs_dir}/run.out
-#BSUB -eo {logs_dir}/run.err
+#BSUB -o {logs_dir}/run_%J.out
+#BSUB -e {logs_dir}/run_%J.err
+
 # -- end of LSF options --
 
 # Activate venv
@@ -43,4 +44,4 @@ source activate eg3d
 module load gcc/9.2.0
 module load cuda/11.1
 
-python train.py --outdir=./training-runs --cfg=ffhq --data={data} --gpus={gpu_num} --batch={batch_size} --gamma={gamma} --gen_pose_cond=True --age_scale={age_scale}  --age_loss_fn={age_loss_fn}"""
+python train.py --outdir=./training-runs --cfg=ffhq --data={data} --gpus={gpu_num} --batch={batch_size} --gamma={gamma} --gen_pose_cond=True --age_scale={age_scale}  --age_loss_fn={age_loss_fn} --id_scale={id_scale} --snap={snap} --batch_division={batch_division}"""

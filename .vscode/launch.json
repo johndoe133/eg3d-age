@@ -10,7 +10,7 @@
             "request": "attach",
             "connect": {
                 "host": "10.66.12.19",
-                "port": 1222
+                "port": 1400
             },
             "justMyCode": false
         },
@@ -20,7 +20,7 @@
             "request": "attach",
             "connect": {
                 "host": "10.66.20.9",
-                "port": 1222
+                "port": 1400
             },
             "justMyCode": false
         },
@@ -30,7 +30,7 @@
             "request": "attach",
             "connect": {
                 "host": "10.66.20.1",
-                "port": 1222
+                "port": 1400
             },
             "justMyCode": false
         }

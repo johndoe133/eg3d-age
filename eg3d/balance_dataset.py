@@ -9,7 +9,7 @@ time.sleep(3)
 def flatten(l):
     return [item for sublist in l for item in sublist]
 
-f = open('/work3/s174379/datasets/FFHQ_512_6/dataset.json')
+f = open('./datasets/FFHQ_512_6_balanced/dataset_ages.json')
 data = json.load(f)
 
 new_data = []
