@@ -10,6 +10,11 @@ from scripts.run_pti import run_PTI
 import matplotlib.pyplot as plt
 from scripts.latent_editor_wrapper import LatentEditorWrapper
 from camera_utils import LookAtPoseSampler, FOV_to_intrinsics
+import sys
+home = os.path.expanduser('~')
+sys.path.append(os.path.join(home, 'Documents/eg3d-age/eg3d/training'))
+from estimate_age import AgeEstimator
+import cv2
 
 
 image_dir_name = 'image'
@@ -24,35 +29,22 @@ paths_config.checkpoints_dir = './PTI/embeddings'
 paths_config.style_clip_pretrained_mappers = './PTI/pretrained_models'
 hyperparameters.use_locality_regularization = False
 
-
 device = torch.device('cuda')
 
 age=0.8
 
 def run(age, model_path, image_name, run_pti_inversion):
     paths_config.stylegan2_ada_ffhq = model_path
-    ## CONDITIONS - parameter needs changing IF we train with other parameters
-    fov_deg = 4.2647 # 18.837 # might be that 4.2647   # FFHQ's FOV
-    cam2world_pose = LookAtPoseSampler.sample(3.14/2, 3.14/2, torch.tensor([0, 0, 0.2], device=device), radius=2.7, device=device)
-    intrinsics = FOV_to_intrinsics(fov_deg, device=device)
-    cam_pivot = torch.tensor([0,0,0.2], device=device)
-    cam_radius = 2.7
-    conditioning_cam2world_pose = LookAtPoseSampler.sample(np.pi/2, np.pi/2, cam_pivot, radius=cam_radius, device=device)
-    camera_params = torch.cat([cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)
-    conditioning_params = torch.cat([conditioning_cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)
-
-    # sæt den der kopierede vektor ind og brug den
-    # slet den ene parameter da man kun bruger en (tror jeg)
-
-    # c = torch.cat((conditioning_params, torch.tensor([[age]], device=device)), 1)
-    # c_params = torch.cat((camera_params, torch.tensor([[age]], device=device)), 1).float()
-
+    age_estimator = AgeEstimator()
+    c = [0.9999064803123474, -0.006213949993252754, -0.012183905579149723, 0.028693876930960493, -0.0060052573680877686, -0.9998359084129333, 0.017090922221541405, -0.04020780808014847, -0.012288108468055725, -0.017016155645251274, -0.9997797012329102, 2.6995481091464293, 0.0, 0.0, 0.0, 1.0, 4.2647, 0.0, 0.5, 0.0, 4.2647, 0.5, 0.0, 0.0, 1.0] #, -0.4627]
+    # c = np.array([0.9999064803123474, -0.006213949993252754, -0.012183905579149723, 0.028693876930960493, -0.0060052573680877686, -0.9998359084129333, 0.017090922221541405, -0.04020780808014847, -0.012288108468055725, -0.017016155645251274, -0.9997797012329102, 2.6995481091464293, 0.0, 0.0, 0.0, 1.0, 4.2647, 0.0, 0.5, 0.0, 4.2647, 0.5, 0.0, 0.0, 1.0, -0.4627])
+    image_path = os.path.join(paths_config.input_data_path, image_name + '.png')
+    image = cv2.imread(image_path) # load image
+    image =  cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    image = torch.from_numpy(image).float()
+    estimated_age = age_estimator.estimate_age(image.permute(2,0,1)[None,:,:,:]) # so input shape is [1,3,512,512]
+    c.append(estimated_age.item())
     
-    c = conditioning_params
-    c_params = camera_params
-
-    c = np.array([0.9999064803123474, -0.006213949993252754, -0.012183905579149723, 0.028693876930960493, -0.0060052573680877686, -0.9998359084129333, 0.017090922221541405, -0.04020780808014847, -0.012288108468055725, -0.017016155645251274, -0.9997797012329102, 2.6995481091464293, 0.0, 0.0, 0.0, 1.0, 4.2647, 0.0, 0.5, 0.0, 4.2647, 0.5, 0.0, 0.0, 1.0]) #, -0.4627]
-    c = np.array([0.9999064803123474, -0.006213949993252754, -0.012183905579149723, 0.028693876930960493, -0.0060052573680877686, -0.9998359084129333, 0.017090922221541405, -0.04020780808014847, -0.012288108468055725, -0.017016155645251274, -0.9997797012329102, 2.6995481091464293, 0.0, 0.0, 0.0, 1.0, 4.2647, 0.0, 0.5, 0.0, 4.2647, 0.5, 0.0, 0.0, 1.0, -0.4627])
     c = np.reshape(c, (1, 26))
     c = torch.FloatTensor(c).cuda()
     if run_pti_inversion:
