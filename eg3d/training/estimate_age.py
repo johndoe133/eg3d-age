@@ -2,11 +2,17 @@ import os
 import torch
 import numpy as np
 import torch.nn.functional as F
-from .dex.models import Age, Gender
+# from .dex.models import Age
+import sys
+import os
+home = os.path.expanduser('~')
+path = os.path.join(home, "Documents/eg3d-age/eg3d/")
+sys.path.append(path)
+from networks.dex.models import Age
 
-class AgeEstimator2():
+class AgeEstimator():
     def __init__(self):
-        self.age_model_path = os.path.join("./networks/DEX/dex", 'pth/age_sd.pth')
+        self.age_model_path = os.path.join("./networks/dex", 'pth/age_sd.pth')
         self.age_model = Age()
         self.age_model.load_state_dict(torch.load(self.age_model_path))
         self.age_model.requires_grad_(requires_grad=False) # weights are freezed 
@@ -48,3 +54,6 @@ class AgeEstimator2():
             tensor: resized tensor
         """
         return F.interpolate(img, [224,224],  mode='bilinear', align_corners=True)    
+
+if __name__ == "__main__":
+    age = AgeEstimator()

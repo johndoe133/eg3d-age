@@ -17,7 +17,7 @@ from torch_utils import training_stats
 from torch_utils.ops import conv2d_gradfix
 from torch_utils.ops import upfirdn2d
 from training.dual_discriminator import filtered_resizing
-from networks.DEX.estimate_age import AgeEstimator2
+from training.estimate_age import AgeEstimator
 import time
 from training.face_id import FaceIDLoss
 import random
@@ -57,7 +57,7 @@ class StyleGAN2Loss(Loss):
         self.filter_mode = filter_mode
         self.resample_filter = upfirdn2d.setup_filter([1,3,3,1], device=device)
         self.blur_raw_target = True
-        self.age_model = AgeEstimator2()
+        self.age_model = AgeEstimator()
         self.age_loss_MSE = torch.nn.MSELoss()
         self.age_loss_L1 = torch.nn.L1Loss()
         self.cosine_sim = torch.nn.CosineSimilarity()
@@ -81,7 +81,6 @@ class StyleGAN2Loss(Loss):
         Returns:
             tensor: loss
         """
-        #pred_ages = self.AgeEstimator2(imgs)
         images = imgs['image']
         predicted_ages = self.age_model.estimate_age(images.clone())
         predicted_ages = predicted_ages.to(self.device)

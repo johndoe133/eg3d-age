@@ -64,8 +64,3 @@ class Age(VGG):
         self.cls = nn.Linear(4096, classes)
 
 
-
-if __name__ == '__main__':
-    net = Gender()
-    print(net)
-
