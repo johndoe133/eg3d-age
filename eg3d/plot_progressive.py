@@ -31,7 +31,8 @@ import imageio
 @click.option('--fov-deg', help='Field of View of camera in degrees', type=int, required=False, metavar='float', default=18.837, show_default=True)
 @click.option('--shape-format', help='Shape Format', type=click.Choice(['.mrc', '.ply']), default='.mrc')
 @click.option('--reload_modules', help='Overload persistent modules?', type=bool, required=False, metavar='BOOL', default=False, show_default=True)
-@click.option('--img_h', help='Height/width of image', default=512, required=False)
+@click.option('--img_h', help='image height', type=int, required=False,default=512, show_default=True)
+
 def generate_images(
     network_folder: str,
     network: str,
@@ -100,6 +101,7 @@ def generate_images(
     no_ages = len(ages)
     img = torch.cat(imgs, dim=2)
     #t = torch.zeros((128*angles, 128*no_ages, 3))
+
     img_stack=[]
     for i in range(angles):
         img_stack.append(img[0][:, i*img_h*no_ages: (i+1)*img_h*no_ages,:])
