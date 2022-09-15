@@ -12,7 +12,10 @@ import legacy
 def evaluate(
     network_pkl: str,
 ):
-    print(f'Loading networks from {network_pkl}...')
+    print(f'Loading eg3d-age from {network_pkl}...')
     device = torch.device('cuda')
     with dnnlib.util.open_url(network_pkl) as f:
         G = legacy.load_network_pkl(f)['G_ema'].to(device)
+
+    print(f'Loading MRW age estimation model from work3')
+    
