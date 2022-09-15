@@ -11,7 +11,7 @@ import torch
 from tqdm import tqdm
 import mrcfile
 
-from networks.DEX.estimate_age import AgeEstimator
+from training.estimate_age import AgeEstimator
 import legacy
 from camera_utils import LookAtPoseSampler, FOV_to_intrinsics
 from torch_utils import misc
@@ -92,8 +92,8 @@ def generate_images(
         for age in ages:
             c = torch.cat((conditioning_params, torch.tensor([[age]], device=device)), 1)
             c_params = torch.cat((camera_params, torch.tensor([[age]], device=device)), 1)
-            ws = G.mapping(z, c, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff)
-            img = G.synthesis(ws, c_params)['image']
+            ws = G.mapping(z, c_params, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff)
+            img = G.synthesis(ws, c)['image']
 
             img = (img.permute(0, 2, 3, 1) * 127.5 + 128).clamp(0, 255).to(torch.uint8)
             imgs.append(img)
