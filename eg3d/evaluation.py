@@ -170,6 +170,7 @@ def generate_age_plot(save_path,save_dir, ages, angles_p, angles_y):
     fig_name = "grid.png"
     plt.savefig(save_dir + f"/{fig_name}")
     print(f"Figure {fig_name} save at {save_dir}")
+    
 
 def generate_id_plot(save_path_id ,save_dir, ages_id):
     #id plot
