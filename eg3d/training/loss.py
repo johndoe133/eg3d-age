@@ -110,16 +110,13 @@ class StyleGAN2Loss(Loss):
             total_loss += loss
 
         return total_loss
-    def run_id_loss(self, imgs, z, c, swapping_prob, neural_rendering_resolution, margin=0.2, loss='MSE'):
+    def run_id_loss(self, imgs, z, ws, c, neural_rendering_resolution, margin=0.2, loss='MSE', update_emas=False):
         """Returns the identity loss of a subject by comparing the given images to the 
         images aged and young-ified. 
         
         """
         images = imgs['image']
         ages = c[:,-1].clone()
-        # bins = np.linspace(-1, 1, bins)
-
-        # locs = np.digitize(ages, bins)
 
         random_ages = []
 
@@ -131,9 +128,8 @@ class StyleGAN2Loss(Loss):
 
         new_c = c.clone()
         new_c[:,-1] = torch.tensor(random_ages)
-        # with torch.no_grad(): # skal det være no_grad? og swapping_prob=0
         
-        gen_img, _ = self.run_G(z, new_c, swapping_prob=0, neural_rendering_resolution=neural_rendering_resolution)
+        gen_img = self.G.synthesis(ws, new_c, neural_rendering_resolution=neural_rendering_resolution, update_emas=update_emas)
         new_images = gen_img['image']
 
         latent_coords = self.id_model.get_feature_vector(images)
@@ -217,13 +213,13 @@ class StyleGAN2Loss(Loss):
         # Gmain: Maximize logits for generated images.
         if phase in ['Gmain', 'Gboth']:
             with torch.autograd.profiler.record_function('Gmain_forward'):
-                gen_img, _gen_ws = self.run_G(gen_z, gen_c, swapping_prob=swapping_prob, neural_rendering_resolution=neural_rendering_resolution)
+                gen_img, gen_ws = self.run_G(gen_z, gen_c, swapping_prob=swapping_prob, neural_rendering_resolution=neural_rendering_resolution)
                 gen_logits = self.run_D(gen_img, gen_c, blur_sigma=blur_sigma)
                 age_loss = self.run_age_loss(gen_img, gen_c, loss=age_loss_fn)
                 age_loss_scaled = age_loss * age_scale # age scaling
                 
                 if not batch_division:
-                    id_loss = self.run_id_loss(gen_img, gen_z, gen_c, swapping_prob, neural_rendering_resolution, loss='cosine_similarity', margin=0.2)
+                    id_loss = self.run_id_loss(gen_img, gen_z, gen_ws, gen_c, neural_rendering_resolution, loss='cosine_similarity', margin=0.2)
                 else:
                     id_loss = self.run_id_loss2(gen_img, gen_z, gen_c, loss='cosine_similarity')
                 id_loss_scaled = id_loss * id_scale # id scaling
