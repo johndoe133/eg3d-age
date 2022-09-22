@@ -17,14 +17,12 @@ import random
 detector = MTCNN()
 
 # see how to visualize the bounding box and the landmarks at : https://github.com/ipazc/mtcnn/blob/master/example.py 
-
+print("Running batch_mtcnn.py...")
 parser = argparse.ArgumentParser()
 parser.add_argument('--in_root', type=str, default="", help='process folder')
 args = parser.parse_args()
 in_root = args.in_root
-
 out_detection = os.path.join(in_root, "detections")
-
 if not os.path.exists(out_detection):
     os.makedirs(out_detection)
 

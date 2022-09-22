@@ -20,6 +20,7 @@ from Deep3DFaceRecon_pytorch.util.load_mats import load_lm3d
 
 
 if __name__ == '__main__':
+    print("Running crop_images_in_the_wild.py...")
     parser = argparse.ArgumentParser()
     parser.add_argument('--indir', type=str, required=True)
     args = parser.parse_args()
