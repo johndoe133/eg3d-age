@@ -53,7 +53,7 @@ def project(
     G = copy.deepcopy(G).eval().requires_grad_(False).to(device).float()  # type: ignore
 
     # Compute w stats.
-    logprint(f'Computing W midpoint and stddev using {z_avg_samples} samples...')
+    logprint(f'Computing Z midpoint and stddev using {z_avg_samples} samples...')
     z_samples = np.random.RandomState(123).randn(z_avg_samples, G.z_dim) # size (600, 512)
     z_avg = np.mean(z_samples, axis = 0)
     z_std = (np.sum((z_samples - z_avg) ** 2) / z_avg_samples) ** 0.5 # scalar
@@ -117,7 +117,7 @@ def project(
         if synth_images.shape[2] > 256:
             synth_images = F.interpolate(synth_images, size=(256, 256), mode='area')
 
-        if step % 50 == 0 or step==num_steps: # append to save images
+        if step % (num_steps//6) == 0 or step==num_steps: # append to save images
             save_img = (synth_images.permute(0, 2, 3, 1)).clamp(0, 255).to(torch.uint8)
             images.append(save_img)
 
