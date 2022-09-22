@@ -16,7 +16,7 @@ experiments_output_dir = f'{home}/Documents/eg3d-age/eg3d/PTI/output'
 
 ## Input info
 ### Input dir, where the images reside
-input_data_path ='./PTI/image_processed'
+input_data_path = f'{home}/Documents/eg3d-age/dataset_preprocessing/ffhq/Deep3DFaceRecon_pytorch/test/crop'
 ### Inversion identifier, used to keeping track of the inversion results. Both the latent code and the generator
 input_data_id = 'barcelona'
 
