@@ -6,6 +6,7 @@ import matplotlib.ticker as ticker
 import pandas as pd    
 import time
 import json
+from combine_runs import combine_runs
 
 @click.command()
 @click.option('--training_run', type=str, help='Past in folder name in training run', required=True)
@@ -13,7 +14,8 @@ import json
 @click.option('--figsize', help='Figsize of the image', type=tuple, default=(10,7))
 @click.option('--dpi', help='Dots per image for image', type=int, default=300)
 @click.option('--name', help='Name of the output image', type=str, default="training_results.png")
-@click.option('--id', help='If id loss is available', type=bool, default=True)
+@click.option('--id', help='If id loss is available', type=click.BOOL, default=True)
+@click.option('--comb_dir', help='Combined directory to combine results in', type=bool, default=False)
 def generate_images(
     training_run: str,
     outdir: str,
@@ -21,9 +23,15 @@ def generate_images(
     dpi: int,
     name: str,
     id: bool,
+    comb_dir: bool,
 ):
+    time.sleep(5)
     if not(outdir):
         outdir = training_run # save in same folder as training
+
+    if comb_dir:
+        combine_runs(training_run, 'stats.jsonl')
+        combine_runs(training_run, 'metric-fid50k_full.jsonl')
     
     print(f'Creating plots for training run folder:"{training_run}"...')
     #Load data 
