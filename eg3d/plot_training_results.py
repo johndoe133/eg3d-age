@@ -2,6 +2,7 @@ import os
 import click
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 import pandas as pd    
 import time
 import json
@@ -62,6 +63,7 @@ def generate_images(
     training_option = json.load(f)
     id_scale = training_option['id_scale']
     age_scale = training_option['age_scale']
+    snap = training_option['network_snapshot_ticks']
     f.close()
 
     #convert to numpy
@@ -70,7 +72,9 @@ def generate_images(
 
     fig = plt.figure(figsize=figsize, dpi=dpi)
     fig.tight_layout()
+    img_pr_tick = 4000
     x = range(len(hours))
+    x = np.array(x) * img_pr_tick
     
     #GD_ylim = max(list(loss_G + loss_G_std) + list(loss_D + loss_D_std)) * 1.10
     ## AGE LOSS ##
@@ -78,6 +82,8 @@ def generate_images(
     axs1.plot(x, loss_age, label="Loss")
     age_loss_ylim = max(loss_age + loss_age_std)
     axs1.set_ylabel("Age loss")
+    axs1.set_xlabel("Images trained on")
+    axs1.xaxis.set_major_formatter(ticker.FuncFormatter(lambda x, pos: '{:,.0f}'.format(x/1000) + 'k'))
     axs1.set_ylim(0, age_loss_ylim*1.05)
     axs1.fill_between(x, loss_age - loss_age_std, loss_age + loss_age_std, alpha=0.4, label="std")
     axs1.set_title(f"With age_scale = {age_scale}")
@@ -92,6 +98,8 @@ def generate_images(
         id_loss_ylim = 1
     axs2.set_ylabel("ID loss")
     axs2.set_ylim(0, id_loss_ylim*1.05)
+    axs2.set_xlabel("Images trained on")
+    axs2.xaxis.set_major_formatter(ticker.FuncFormatter(lambda x, pos: '{:,.0f}'.format(x/1000) + 'k'))
     axs2.fill_between(x, loss_id - loss_id_std, loss_id + loss_id_std, alpha=0.4, label="std")
     axs2.set_title(f"With id_scale = {id_scale}")
     axs2.legend()
@@ -99,6 +107,8 @@ def generate_images(
     ## GENERATOR LOSS ##
     axs3 = fig.add_subplot(3,2,3)
     axs3.set_ylabel("G loss")
+    axs3.set_xlabel("Images trained on")
+    axs3.xaxis.set_major_formatter(ticker.FuncFormatter(lambda x, pos: '{:,.0f}'.format(x/1000) + 'k'))
     axs3.fill_between(x, loss_G - loss_G_std, loss_G + loss_G_std, alpha=0.4, label="std")
     axs3.set_ylim(0,max(loss_G + loss_G_std)*1.10)
     axs3.plot(x, loss_G, label="Loss")
@@ -107,6 +117,8 @@ def generate_images(
     ## DISCRIMINATOR LOSS ##
     axs4 = fig.add_subplot(3,2,4)
     axs4.plot(x, loss_D, label="Loss")
+    axs4.set_xlabel("Images trained on")
+    axs4.xaxis.set_major_formatter(ticker.FuncFormatter(lambda x, pos: '{:,.0f}'.format(x/1000) + 'k'))
     axs4.set_ylabel("D loss")
     axs4.set_ylim(0,max(loss_D + loss_D_std)*1.10)
     axs4.fill_between(x, loss_D - loss_D_std, loss_D + loss_D_std, alpha=0.4, label="std")
@@ -115,11 +127,14 @@ def generate_images(
     ## FID score
     axs5 = fig.add_subplot(3,2,5)
     axs5.set_ylabel("FID Score")
-    axs5.bar(range(len(fid)), fid, zorder=20)
-    axs5.set_xticks([])
+    x_fid = np.array(range(len(fid)))
+    axs5.bar(x_fid, fid, zorder=20)
+    axs5.set_xlabel("Images trained on")
+    axs5.set_xticks(x_fid)
+    axs5.set_xticklabels([str(int(x)) + 'k' for x in x_fid*img_pr_tick*snap/1000])
     axs5.grid(axis='y')
 
-    
+
     # save figure
     plot_name = name
     plot_path = os.path.join(root, outdir, plot_name)

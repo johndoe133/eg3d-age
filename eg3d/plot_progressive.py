@@ -71,29 +71,27 @@ def generate_images(
         return z
 
     fov_deg = 18.837
-    cam2world_pose = LookAtPoseSampler.sample(3.14/2, 3.14/2, torch.tensor([0, 0, 0.2], device=device), radius=2.7, device=device)
     intrinsics = FOV_to_intrinsics(fov_deg, device=device)
 
     imgs = []
 
-    angle_p = -0.2
+    angle_p = 0
     ages = [5,10,20,30,40,50,60,70]
     ages = [normalize(age) for age in ages]
 
     for angle_y, angle_p in [(.4, angle_p), (0, angle_p), (-.4, angle_p)]:
-        cam_pivot = torch.tensor(G.rendering_kwargs.get('avg_camera_pivot', [0, 0, 0]), device=device)
+        cam_pivot = torch.tensor(G.rendering_kwargs.get('avg_camera_pivot', [0,0,0]), device=device)
         cam_radius = G.rendering_kwargs.get('avg_camera_radius', 2.7)
         cam2world_pose = LookAtPoseSampler.sample(np.pi/2 + angle_y, np.pi/2 + angle_p, cam_pivot, radius=cam_radius, device=device)
         conditioning_cam2world_pose = LookAtPoseSampler.sample(np.pi/2, np.pi/2, cam_pivot, radius=cam_radius, device=device)
         camera_params = torch.cat([cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)
         conditioning_params = torch.cat([conditioning_cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)
 
-        
         for age in ages:
             c = torch.cat((conditioning_params, torch.tensor([[age]], device=device)), 1)
             c_params = torch.cat((camera_params, torch.tensor([[age]], device=device)), 1)
-            ws = G.mapping(z, c_params, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff)
-            img = G.synthesis(ws, c)['image']
+            ws = G.mapping(z, c, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff)
+            img = G.synthesis(ws, c_params)['image']
 
             img = (img.permute(0, 2, 3, 1) * 127.5 + 128).clamp(0, 255).to(torch.uint8)
             imgs.append(img)
@@ -115,7 +113,7 @@ def generate_images(
     imgs_gif = []
     font = ImageFont.truetype("FreeSerif.ttf", 40)
     
-    angle_y, angle_p = (0, -0.2)
+    angle_y, angle_p = (0, 0)
     cam_pivot = torch.tensor(G.rendering_kwargs.get('avg_camera_pivot', [0, 0, 0]), device=device)
     cam_radius = G.rendering_kwargs.get('avg_camera_radius', 2.7)
     cam2world_pose = LookAtPoseSampler.sample(np.pi/2 + angle_y, np.pi/2 + angle_p, cam_pivot, radius=cam_radius, device=device)

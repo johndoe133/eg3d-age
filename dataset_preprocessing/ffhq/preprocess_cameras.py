@@ -68,6 +68,7 @@ def fix_pose_simplify(pose):
     return simple_pose_matrix.numpy()
 
 if __name__ == '__main__':
+    print("Running preprocess_cameras.py...")
     parser = argparse.ArgumentParser()
     parser.add_argument("--source", type=str)
     # parser.add_argument("--dest", type=str, default=None)

@@ -29,26 +29,11 @@ def visualize(image_name, c):
     embedding_dir_w = './PTI/embeddings/w'
     z_pivot = torch.load(f'{embedding_dir_w}/{image_name}.pt')
 
-
-    # cuda0 = torch.device('cuda:0')
-
-    # intrinsics = FOV_to_intrinsics(18.837, device=cuda0) #default value
-    # angle_y, angle_p = (0,-0.2)
-    # cam_pivot = torch.tensor(old_G.rendering_kwargs.get('avg_camera_pivot', [0, 0, 0]), device=cuda0)
-    # cam_radius = old_G.rendering_kwargs.get('avg_camera_radius', 2.7)
-    # cam2world_pose = LookAtPoseSampler.sample(np.pi/2 + angle_y, np.pi/2 + angle_p, cam_pivot, radius=cam_radius, device=cuda0)
-    # conditioning_cam2world_pose = LookAtPoseSampler.sample(np.pi/2, np.pi/2, cam_pivot, radius=cam_radius, device=cuda0)
-    # camera_params = torch.cat([cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)
-    # random_age=0.8
-    # c_params = torch.cat((camera_params, torch.tensor([[random_age]], device=cuda0)), 1)
-
-    # old_image = old_G.synthesis(w_pivot, c_params, noise_mode='const', force_fp32 = True)['image']
-    # new_image = new_G.synthesis(w_pivot, c_params, noise_mode='const', force_fp32 = True)['image']
     w_pivot_old = old_G.mapping(z_pivot, c)
-    old_image = old_G.synthesis(w_pivot_old, c, noise_mode='const', force_fp32 = True)['image']
+    old_image = old_G.synthesis(w_pivot_old, c)['image']
 
     w_pivot = new_G.mapping(z_pivot, c)
-    new_image = new_G.synthesis(w_pivot, c, noise_mode='const', force_fp32 = True)['image']
+    new_image = new_G.synthesis(w_pivot, c)['image'] #, noise_mode='const', force_fp32 = True
 
     images = [old_image, new_image]
     names = ["initial_inversion", "pti_inversion"]
