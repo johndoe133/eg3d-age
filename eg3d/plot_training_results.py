@@ -36,7 +36,6 @@ def generate_images(
     id: bool,
     comb_dir: bool,
 ):
-    time.sleep(5)
     if not(outdir):
         outdir = training_run # save in same folder as training
 
@@ -87,7 +86,9 @@ def generate_images(
     for row in fid_df.iterrows():
         fid.append(row[1]["results"]["fid50k_full"])
     
-    training_option_path = os.path.join(root, training_run, "training_options.json")
+    sub_runs  = [ f.path for f in os.scandir(os.path.join(root, training_run)) if f.is_dir() ]
+    first_train_run = sub_runs[0]
+    training_option_path = os.path.join(first_train_run, "training_options.json")
     f = open(training_option_path)
     training_option = json.load(f)
     id_scale = training_option['id_scale']
