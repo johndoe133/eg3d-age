@@ -16,12 +16,13 @@ parser.add_argument("--batch_size", help="",default = 8, type=int)
 parser.add_argument("--gamma", help="",default = 5)
 parser.add_argument("--resume", help="",default = None)
 parser.add_argument("--devices", help="",default = '0,1')
-parser.add_argument("--data", help="",default = 'datasets/FFHQ_512')
+parser.add_argument("--data", help="",default = '/work3/s174379/datasets/FFHQ_512_6_balanced')
 parser.add_argument("--age_scale", help="",default = '1')
 parser.add_argument("--age_loss_fn", help="", default="MSE")
 parser.add_argument("--id_scale", help="", default=1)
 parser.add_argument("--snap", help="How many ticks between saving a snapshot", default=50)
 parser.add_argument("--batch_division", help="", default=False)
+parser.add_argument("--freeze", help="", default=False)
 
 args = parser.parse_args()
 
@@ -68,6 +69,7 @@ submit_script = template_text.format(
                         "id_scale": args.id_scale,
                         "snap": args.snap,
                         "batch_division": args.batch_division,
+                        "freeze": args.freeze,
                     }
                 )
 
