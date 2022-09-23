@@ -147,6 +147,7 @@ def generate_images(
     fig.tight_layout()
     fig.savefig(plot_path)
     plt.savefig(plot_path_pgf)
+    
     print(f'Saved figures to {os.path.join(root, outdir)}')
     
     
