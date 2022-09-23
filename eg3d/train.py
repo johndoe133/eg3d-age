@@ -53,18 +53,31 @@ def subprocess_fn(rank, c, temp_dir):
 
 #----------------------------------------------------------------------------
 
-def launch_training(c, desc, outdir, dry_run):
+def launch_training(c, desc, outdir, dry_run, resume=None):
     dnnlib.util.Logger(should_flush=True)
 
     # Pick output directory.
-    prev_run_dirs = []
+    prev_run_parent_dirs = []
     if os.path.isdir(outdir):
-        prev_run_dirs = [x for x in os.listdir(outdir) if os.path.isdir(os.path.join(outdir, x))]
-    prev_run_ids = [re.match(r'^\d+', x) for x in prev_run_dirs]
-    prev_run_ids = [int(x.group()) for x in prev_run_ids if x is not None]
-    cur_run_id = max(prev_run_ids, default=-1) + 1
-    c.run_dir = os.path.join(outdir, f'{cur_run_id:05d}-{desc}')
-    assert not os.path.exists(c.run_dir)
+        prev_run_parent_dirs = [x for x in os.listdir(outdir) if os.path.isdir(os.path.join(outdir, x))]
+
+    if resume and resume.split('/')[-1] != 'ffhqrebalanced512-64.pkl':
+        # /training-runs/parent_run_name/00003-ffhq-FFHQ_512_6_balanced-gpus2-batch8-gamma5/network-snapshot-0000.pkl
+        if len(resume.split('/')) >= 3:
+            run_parent = resume.split('/')[-3]
+            if run_parent in prev_run_parent_dirs:
+                prev_run_dirs = [x for x in os.listdir(os.path.join(outdir,run_parent)) if os.path.isdir(os.path.join(outdir, run_parent, x))]
+                prev_run_ids = [re.match(r'^\d+', x) for x in prev_run_dirs]
+                prev_run_ids = [int(x.group()) for x in prev_run_ids if x is not None]
+                cur_run_id = max(prev_run_ids, default=-1) + 1 # 4
+                c.run_dir = os.path.join(outdir, run_parent, f'{cur_run_id:05d}-{desc}')
+                assert not os.path.exists(c.run_dir)
+    else:
+        prev_parent_run_ids = [re.match(r'^\d+', x) for x in prev_run_parent_dirs]
+        prev_parent_run_ids = [int(x.group()) for x in prev_parent_run_ids if x is not None]
+        cur_parent_run_id = max(prev_parent_run_ids, default=-1) + 1
+        c.run_dir = os.path.join(outdir, f'{cur_parent_run_id:05d}', f'00000-{desc}')
+        assert not os.path.exists(c.run_dir)
 
     # Print options.
     print()
@@ -196,6 +209,7 @@ def parse_comma_separated_list(s):
 @click.option('--id_scale',    help='Scales id loss.', metavar='FLOAT', default=10.0, required=False, show_default=True)
 @click.option('--age_loss_fn',    help='Type of age loss function', metavar='STR', default="MSE", required=False)
 @click.option('--batch_division', help='If batch should be divided in half and doubled again so that there is two of each id', metavar='BOOL', default=False, required=False)
+@click.option('--freeze', help='Freeze parameters of volume synthesis and super resolution modules', metavar='BOOL', default=False, required=False)
 
 
 def main(**kwargs):
@@ -260,6 +274,7 @@ def main(**kwargs):
     c.id_scale = opts.id_scale
     c.age_loss_fn = opts.age_loss_fn
     c.batch_division = opts.batch_division
+    c.freeze = opts.freeze
 
     # Sanity checks.
     if c.batch_size % c.num_gpus != 0:
@@ -397,7 +412,7 @@ def main(**kwargs):
         desc += f'-{opts.desc}'
 
     # Launch.
-    launch_training(c=c, desc=desc, outdir=opts.outdir, dry_run=opts.dry_run)
+    launch_training(c=c, desc=desc, outdir=opts.outdir, dry_run=opts.dry_run, resume=c.resume_pkl)
 
 #----------------------------------------------------------------------------
 
