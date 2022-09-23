@@ -110,7 +110,7 @@ def project(
         zs = (z_opt + z_noise) #.repeat([G.backbone.mapping.num_ws, 1])
         
         ws = G.mapping(zs, c)
-        synth_images = G.synthesis(ws, c, noise_mode='const')['image'] 
+        synth_images = G.synthesis(ws, c, noise_mode='const', force_fp32=True)['image'] 
 
         # Downsample image to 256x256 if it's larger than that. VGG was built for 224x224 images.
         synth_images = (synth_images + 1) * (255 / 2)

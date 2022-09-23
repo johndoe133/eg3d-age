@@ -116,7 +116,7 @@ def project(
         w_noise = torch.randn_like(w_opt) * w_noise_scale # torch.Size([1, 1, 512])
         ws = (w_opt + w_noise).repeat([1, G.backbone.mapping.num_ws, 1]) # torch.Size([1, 14, 512])
         
-        synth_images = G.synthesis(ws, c, noise_mode='const')['image']  #torch.Size([1, 3, 512, 512])
+        synth_images = G.synthesis(ws, c, noise_mode='const', force_fp32=True)['image']  #torch.Size([1, 3, 512, 512])
 
 
         # Downsample image to 256x256 if it's larger than that. VGG was built for 224x224 images.
