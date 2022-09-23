@@ -6,7 +6,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 import os
-from PIL import Image
+from PIL import Image, ImageFont, ImageDraw
 
 def normalize(x, rmin = 5, rmax = 80, tmin = -1, tmax = 1):
     """Defined in eg3d.training.training_loop
@@ -24,10 +24,23 @@ def load_generators(image_name):
         new_G = torch.load(f_new).cuda()
 
     return old_G, new_G
+
+def image_grid(imgs, rows, cols):
+    #https://stackoverflow.com/questions/37921295/python-pil-image-make-3x3-grid-from-sequence-images
+    assert len(imgs) == rows*cols
+
+    w, h = imgs[0].size
+    grid = Image.new('RGB', size=(cols*w, rows*h))
+    grid_w, grid_h = grid.size
     
+    for i, img in enumerate(imgs):
+        grid.paste(img, box=(i%cols*w, i//cols*h))
+    return grid
+
+
 def edit_age(image_name, model_path, c):
     old_G, new_G = load_generators(image_name)
-    ages = [age for age in np.linspace(5,75,11)]
+    ages = [age for age in np.linspace(5,75,10)]
     embedding_dir_w = './PTI/embeddings/w'
     z_pivot = torch.load(f'{embedding_dir_w}/{image_name}.pt')
     images = []
@@ -35,13 +48,25 @@ def edit_age(image_name, model_path, c):
         new_c = c
         new_c[0][-1] = normalize(age)
         w_pivot = new_G.mapping(z_pivot, c)
-        new_image = new_G.synthesis(w_pivot, new_c, noise_mode='const')['image']
-        img = (new_image.permute(0, 2, 3, 1) * 127.5 + 128).clamp(0, 255).to(torch.uint8)
+        new_image = new_G.synthesis(w_pivot, new_c)['image']
+        img = (new_image.permute(0, 2, 3, 1) * 127.5 + 128).clamp(0, 255).to(torch.uint8)[0].cpu().numpy()
+        img = Image.fromarray(img)
         # F.interpolate(img.float(), [224,224],  mode='bilinear', align_corners=True).shape
         images.append(img)
-    images = torch.cat(images, dim=2)
+    rows = 2
+    columns = 5
+    grid = image_grid(images, rows, columns)
     home_dir = os.path.expanduser('~')
     path = f"Documents/eg3d-age/eg3d/PTI/output/{image_name}"
+    draw = ImageDraw.Draw(grid)
+    font_size = 80
+    font = ImageFont.truetype("FreeSerif.ttf", font_size)
+    counter = 0
+    for i in range(rows):
+        for j in range(columns):
+            draw.text((j*512 , i*512 + 500 - font_size), f"Age: {int(ages[counter])}", (255,255,255), font=font)
+            counter += 1
+
     save_name = os.path.join(home_dir, path, "aging_effect.png")
-    Image.fromarray(images[0].cpu().numpy(), 'RGB').save(save_name)
+    grid.save(save_name)
     return img

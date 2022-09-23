@@ -39,7 +39,7 @@ def pti_pipeline(
     if preprocess:
         pre_process_images()
 
-    c = run(age, model_path, image_name, run_pti_inversion)
+    c = run(model_path, image_name, run_pti_inversion)
 
     visualize(image_name, c)
     print(f"See output in folder eg3d/PTI/output/{image_name}")

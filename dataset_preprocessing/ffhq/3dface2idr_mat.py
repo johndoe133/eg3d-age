@@ -19,6 +19,8 @@ import sys
 sys.path.append('Deep3DFaceRecon_pytorch')
 from Deep3DFaceRecon_pytorch.models.bfm import ParametricFaceModel
 
+print("Running 3dface2idr_mat.py...")
+
 parser = argparse.ArgumentParser()
 parser.add_argument('--in_root', type=str, default="", help='process folder')
 args = parser.parse_args()
@@ -28,7 +30,6 @@ npys = sorted([x for x in os.listdir(in_root) if x.endswith(".mat")])
 
 mode = 1 
 outAll={}
-
 face_model = ParametricFaceModel(bfm_folder='Deep3DFaceRecon_pytorch/BFM')
 
 for src_filename in npys:
@@ -77,5 +78,6 @@ for src_filename in npys:
 
 
 dst = os.path.join(in_root, "cameras.json")
+print("Creating file at dst:", dst)
 with open(dst, "w") as outfile:
     json.dump(outAll, outfile)

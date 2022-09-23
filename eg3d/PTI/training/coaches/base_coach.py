@@ -130,7 +130,7 @@ class BaseCoach:
     def forward(self, z):
         ### Camera params
         w = self.G.mapping(z, self.c)
-        generated_images = self.G.synthesis(w, self.c, noise_mode='const')['image']
+        generated_images = self.G.synthesis(w, self.c, noise_mode='const', force_fp32=True)['image']
         return generated_images
 
     def initilize_e4e(self):
