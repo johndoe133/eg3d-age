@@ -154,4 +154,3 @@ dependencies:
     - tensorboard-plugin-wit==1.8.1
     - werkzeug==2.2.1
     - zipp==3.8.1
-prefix: /zhome/d7/6/127158/miniconda3/envs/eg3d
