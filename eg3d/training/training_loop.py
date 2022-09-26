@@ -359,24 +359,12 @@ def training_loop(
             phase_real_img = (phase_real_img.to(device).to(torch.float32) / 127.5 - 1).split(batch_gpu)
             phase_real_c = phase_real_c.to(device).split(batch_gpu)
             # all_gen_z = torch.randn([len(phases) * batch_size, G.z_dim], device=device)
-            if batch_division:
-                all_gen_z = torch.randn([len(phases) * batch_size//2, G.z_dim], device=device)
-                all_gen_z = torch.repeat_interleave(all_gen_z, 2, dim=0) # repeat latent codes 
-                all_gen_z = [phase_gen_z.split(batch_gpu) for phase_gen_z in all_gen_z.split(batch_size)]
-                all_gen_c = [training_set.get_label(np.random.randint(len(training_set))) for _ in range(len(phases) * batch_size//2)]
-                all_gen_c_new = []
-                for element in all_gen_c: # repeat each element
-                    all_gen_c_new.append(element)
-                    all_gen_c_new.append(element)
-                # replace age sampled from dataset.json with generated age between range
-                all_gen_c = [np.concatenate([gen_c_initial[:-1], generate_age(5, 80)]) for gen_c_initial in all_gen_c_new]
-            else:
-                all_gen_z = torch.randn([len(phases) * batch_size, G.z_dim], device=device)
-                all_gen_z = [phase_gen_z.split(batch_gpu) for phase_gen_z in all_gen_z.split(batch_size)]
-                all_gen_c = [training_set.get_label(np.random.randint(len(training_set))) for _ in range(len(phases) * batch_size)]
-                # replace age sampled from dataset.json with generated age between range
-                all_gen_c = [np.concatenate([gen_c_initial[:-1], generate_age(5, 80)]) for gen_c_initial in all_gen_c]
-                
+            all_gen_z = torch.randn([len(phases) * batch_size, G.z_dim], device=device)
+            all_gen_z = [phase_gen_z.split(batch_gpu) for phase_gen_z in all_gen_z.split(batch_size)]
+            all_gen_c = [training_set.get_label(np.random.randint(len(training_set))) for _ in range(len(phases) * batch_size)]
+            # replace age sampled from dataset.json with generated age between range
+            all_gen_c = [np.concatenate([gen_c_initial[:-1], generate_age(5, 80)]) for gen_c_initial in all_gen_c]
+            
             all_gen_c = torch.from_numpy(np.stack(all_gen_c)).pin_memory().to(device)
             all_gen_c = all_gen_c.float() # needed
             all_gen_c = [phase_gen_c.split(batch_gpu) for phase_gen_c in all_gen_c.split(batch_size)]
