@@ -212,6 +212,7 @@ def training_loop(
     age_loss_fn             = "MSE",    # Age loss function
     id_scale                = 1,        # Scales ID loss
     batch_division          = True,     # Batch size remains the same but the IDs in the batch is halfed and the remaining are then duplicated. 
+    freeze                  = False,    # If True, freezes weights of the synthesis and super resolution modules
 ):
     # Initialize.
     start_time = time.time()
@@ -254,6 +255,11 @@ def training_loop(
             resume_data = legacy.load_network_pkl(f)
         for name, module in [('G', G), ('D', D), ('G_ema', G_ema)]:
             misc.copy_params_and_buffers(resume_data[name], module, require_all=False)
+
+    if freeze:
+        # freeze synthesis and superres weights
+        G.superresolution.requires_grad_(requires_grad=False)
+        G.backbone.synthesis.requires_grad_(requires_grad=False)
 
     # Print network summary tables.
     if rank == 0:
@@ -384,6 +390,10 @@ def training_loop(
             # Accumulate gradients.
             phase.opt.zero_grad(set_to_none=True)
             phase.module.requires_grad_(True)
+            if freeze and phase.name in ['Gmain', 'Greg']:
+                # freeze synthesis and superres weights
+                phase.module.superresolution.requires_grad_(requires_grad=False)
+                phase.module.backbone.synthesis.requires_grad_(requires_grad=False)
             for real_img, real_c, gen_z, gen_c in zip(phase_real_img, phase_real_c, phase_gen_z, phase_gen_c):
                 loss.accumulate_gradients(phase=phase.name, real_img=real_img, real_c=real_c, gen_z=gen_z, gen_c=gen_c, 
                                            gain=phase.interval, cur_nimg=cur_nimg, age_scale=age_scale, age_loss_fn = age_loss_fn, 
