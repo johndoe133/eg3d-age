@@ -213,6 +213,7 @@ def training_loop(
     id_scale                = 1,        # Scales ID loss
     batch_division          = True,     # Batch size remains the same but the IDs in the batch is halfed and the remaining are then duplicated. 
     freeze                  = False,    # If True, freezes weights of the synthesis and super resolution modules
+    categories              = 1,        # 0 or 1 if age is a number, otherwise indicates how many age categories there are
 ):
     # Initialize.
     start_time = time.time()
@@ -254,7 +255,7 @@ def training_loop(
         with dnnlib.util.open_url(resume_pkl) as f:
             resume_data = legacy.load_network_pkl(f)
         for name, module in [('G', G), ('D', D), ('G_ema', G_ema)]:
-            misc.copy_params_and_buffers(resume_data[name], module, require_all=False)
+            misc.copy_params_and_buffers(resume_data[name], module, require_all=False, categories=categories)
 
     if freeze:
         # freeze synthesis and superres weights
