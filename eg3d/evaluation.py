@@ -13,6 +13,7 @@ from training.training_loop import normalize, denormalize
 from tqdm import tqdm
 from training.face_id import FaceIDLoss
 from scipy.stats import gaussian_kde
+from training.coral import Coral
 
 
 global save_path, save_dir
@@ -226,7 +227,7 @@ def generate_id_plot(save_path_id ,save_dir, ages_id):
 
 
 def run_age_evaluation(
-    ages, angles_p, angles_y, network_folder, network_pkl, seed, 
+    model_name, ages, angles_p, angles_y, network_folder, network_pkl, seed, 
     device, truncation_cutoff, truncation_psi, seeds
     ):
     
@@ -239,7 +240,10 @@ def run_age_evaluation(
     np.random.seed(seed)
 
     ## Age evaluation
-    age_model = AgeEstimator()
+    if model_name == 'coral':
+        age_model = Coral()
+    elif model_name == 'DEX':
+        age_model = AgeEstimator()
     angles = []
     for angle_p in angles_p:
         for angle_y in angles_y:
@@ -248,7 +252,6 @@ def run_age_evaluation(
     
     res = []
     for seed in tqdm(seeds):
-        print("Testing seed:", seed)
         z = torch.from_numpy(np.random.RandomState(seed).randn(1, G.z_dim)).to(device)
         for age in tqdm(ages):
             c = get_conditioning_parameter(age, G, device)
@@ -257,7 +260,9 @@ def run_age_evaluation(
                 ws = G.mapping(z, c, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff)
                 generated_image =  G.synthesis(ws, c_camera)['image']
                 age_hat = age_model.estimate_age(generated_image)
-                age_hat = denormalize(age_hat).item()
+                if model_name == "DEX":
+                    age_hat = denormalize(age_hat)
+                age_hat = age_hat.item()
                 mae = np.abs(age - age_hat)
                 error = age-age_hat
                 res.append([seed, age, angle_y, angle_p, age_hat, mae, error])
@@ -295,7 +300,7 @@ def run_id_evaluation(
             ws = G.mapping(z, c, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff)
             generated_image_1 =  G.synthesis(ws, c_camera)['image']
             feature_v_1 = id_model.get_feature_vector(generated_image_1)
-            for age2 in tqdm(ages):
+            for age2 in ages:
                 if age1 == age2:
                     continue # skip comparing similar images
                 c = get_conditioning_parameter(age2, G, device)
@@ -328,6 +333,7 @@ def run_id_evaluation(
 @click.option('--create_graph', help="Whether to generate a graph", default=True, type=bool)
 @click.option('--run_eval', help='Whether to run evaluation loop', default=True, type=bool)
 @click.option('--no-img', help='Number of random seeds to generate synthetic images from', default=10, type=int)
+@click.option('--model_name', help='Age model used', default="coral", type=str)
 
 def evaluate(
     network_folder: str,
@@ -338,6 +344,7 @@ def evaluate(
     create_graph: bool,
     run_eval: bool,
     no_img: int,
+    model_name: str,
 
     ):
     ## LOADING NETWORK ##
@@ -351,12 +358,12 @@ def evaluate(
         pkls = sorted(pkls)
         network_pkl = pkls[-1]
     
-    ages = np.round(np.linspace(5,80,9))
+    ages = np.round(np.linspace(16,70,9))
     ages_id = np.linspace(5,80,6)
     angles_p = [0.3, 0, -0.3]
     angles_y = [.4, 0, -.4]
     if run_eval:
-        run_age_evaluation(ages, angles_p, angles_y, network_folder, network_pkl, seed, device, truncation_cutoff, truncation_psi, seeds)
+        run_age_evaluation(model_name, ages, angles_p, angles_y, network_folder, network_pkl, seed, device, truncation_cutoff, truncation_psi, seeds)
         run_id_evaluation(ages_id, network_folder, network_pkl, seed, device, truncation_cutoff, truncation_psi, seeds)
     
     save_dir = os.path.join("Evaluations", network_folder.split("/")[-1])
