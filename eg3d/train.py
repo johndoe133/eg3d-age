@@ -205,11 +205,14 @@ def parse_comma_separated_list(s):
 @click.option('--density_reg_p_dist',    help='density regularization strength.', metavar='FLOAT', type=click.FloatRange(min=0), default=0.004, required=False, show_default=True)
 @click.option('--reg_type', help='Type of regularization', metavar='STR',  type=click.Choice(['l1', 'l1-alt', 'monotonic-detach', 'monotonic-fixed', 'total-variation']), required=False, default='l1')
 @click.option('--decoder_lr_mul',    help='decoder learning rate multiplier.', metavar='FLOAT', type=click.FloatRange(min=0), default=1, required=False, show_default=True)
+
+# Age settings
 @click.option('--age_scale',    help='Scales age loss.', metavar='FLOAT', default=1.0, required=False, show_default=True)
 @click.option('--id_scale',    help='Scales id loss.', metavar='FLOAT', default=10.0, required=False, show_default=True)
 @click.option('--age_loss_fn',    help='Type of age loss function', metavar='STR', default="MSE", required=False)
 @click.option('--batch_division', help='If batch should be divided in half and doubled again so that there is two of each id', metavar='BOOL', default=False, required=False)
 @click.option('--freeze', help='Freeze parameters of volume synthesis and super resolution modules', metavar='BOOL', default=False, required=False)
+@click.option('--categories', help='Number of age categories, 0 or 1 means scalar', metavar='INT', default=1, required=False)
 
 
 def main(**kwargs):
@@ -275,6 +278,7 @@ def main(**kwargs):
     c.age_loss_fn = opts.age_loss_fn
     c.batch_division = opts.batch_division
     c.freeze = opts.freeze
+    c.categories = opts.categories
 
     # Sanity checks.
     if c.batch_size % c.num_gpus != 0:
