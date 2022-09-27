@@ -14,6 +14,57 @@ from tqdm import tqdm
 from training.face_id import FaceIDLoss
 from scipy.stats import gaussian_kde
 from training.coral import Coral
+from plot_training_results import plot_setup, compute_figsize
+
+@click.command()
+@click.option('--network_folder', help='Network folder name', required=True)
+@click.option('--network', help='Network folder name', default=None, required=False)
+@click.option('--seed', help='Seed to generate from', default=42, required=False, type=int)
+@click.option('--trunc', 'truncation_psi', type=float, help='Truncation psi', default=1, show_default=True)
+@click.option('--trunc-cutoff', 'truncation_cutoff', type=int, help='Truncation cutoff', default=14, show_default=True)
+@click.option('--create_graph', help="Whether to generate a graph", default=True, type=bool)
+@click.option('--run_eval', help='Whether to run evaluation loop', default=True, type=bool)
+@click.option('--no-img', help='Number of random seeds to generate synthetic images from', default=10, type=int)
+@click.option('--model_name', help='Age model used', default="coral", type=str)
+
+def evaluate(
+    network_folder: str,
+    network: str,
+    seed: int,
+    truncation_psi: float,
+    truncation_cutoff: int,
+    create_graph: bool,
+    run_eval: bool,
+    no_img: int,
+    model_name: str,
+
+    ):
+    ## LOADING NETWORK ##
+    print(f'Loading networks from "{network_folder}"...')
+    device = torch.device('cuda')
+    seeds = np.random.randint(1,100000, size=no_img)
+    if network is not None: # choose specific network
+        network_pkl = network
+    else: # choose the network trained the longest
+        pkls = [string for string in os.listdir(network_folder) if '.pkl' in string]
+        pkls = sorted(pkls)
+        network_pkl = pkls[-1]
+    
+    ages = np.round(np.linspace(16,70,9))
+    ages_id = np.linspace(5,80,6)
+    angles_p = [0.3, 0, -0.3]
+    angles_y = [.4, 0, -.4]
+    if run_eval:
+        run_age_evaluation(model_name, ages, angles_p, angles_y, network_folder, network_pkl, seed, device, truncation_cutoff, truncation_psi, seeds)
+        run_id_evaluation(ages_id, network_folder, network_pkl, seed, device, truncation_cutoff, truncation_psi, seeds)
+    
+    save_dir = os.path.join("Evaluations", network_folder.split("/")[-1])
+    save_path_age = os.path.join(save_dir, "age_evaluation.csv")
+    save_path_id = os.path.join(save_dir, "id_evaluation.csv")
+
+    if create_graph:
+        generate_age_plot(save_path_age, save_dir, ages, angles_p, angles_y)
+        generate_id_plot(save_path_id ,save_dir, ages_id)
 
 
 global save_path, save_dir
@@ -71,10 +122,11 @@ def get_feature_vector(img):
 # Evaluation pipeline
 
 def generate_age_plot(save_path,save_dir, ages, angles_p, angles_y):
+    plot_setup()
     df = pd.read_csv(save_path)
     colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
-
-    fig, axs = plt.subplots(3, 1, sharex=False, figsize = (10,8), dpi=300)
+    figsize = compute_figsize(426, 500)
+    fig, axs = plt.subplots(3, 1, sharex=False, figsize = figsize, dpi=300)
     for i, age in enumerate(ages):
         df_age = df[df.age==age]
         age_hat = df_age.age_hat.to_numpy()
@@ -105,7 +157,7 @@ def generate_age_plot(save_path,save_dir, ages, angles_p, angles_y):
     plt.savefig(save_dir + f"/{fig_name}")
     print(f"Figure {fig_name} save at {save_dir}")
 
-    fig, axs = plt.subplots(3, 3, sharex=True, sharey=True, figsize = (10,8), dpi=300)
+    fig, axs = plt.subplots(3, 3, sharex=True, sharey=True, figsize = figsize, dpi=300)
 
     pad = 5 # in points
 
@@ -144,7 +196,7 @@ def generate_age_plot(save_path,save_dir, ages, angles_p, angles_y):
     plt.savefig(save_dir + f"/{fig_name}")
     print(f"Figure {fig_name} save at {save_dir}")
 
-    fig, axs = plt.subplots(3, 3, sharex=True, sharey=True, figsize = (10,8), dpi=300)
+    fig, axs = plt.subplots(3, 3, sharex=True, sharey=True, figsize = figsize, dpi=300)
     for i, age in enumerate(ages):
         df_age = df[df.age==age]
         age_hat = df_age.age_hat.to_numpy()
@@ -160,6 +212,8 @@ def generate_age_plot(save_path,save_dir, ages, angles_p, angles_y):
         ylimmin, ylimmax = axs.ravel()[i].get_ylim()
         axs.ravel()[i].vlines(int(age), 0, 1, linestyles = '--', colors="black", label=f"Set age")
         axs.ravel()[i].set_ylim(ylimmin, 0.1)
+
+        axs.ravel()[i].set_xticks(np.linspace(0, 80, 5))
          # Axis labels
         if axs.ravel()[i].get_subplotspec().is_first_col():
             axs.ravel()[i].set_ylabel("Normalized Density")
@@ -174,6 +228,8 @@ def generate_age_plot(save_path,save_dir, ages, angles_p, angles_y):
     
 
 def generate_id_plot(save_path_id ,save_dir, ages_id):
+    plot_setup()
+    figsize = compute_figsize(426, 500)
     #id plot
     bandwidth=.005
     df = pd.read_csv(save_path_id)
@@ -181,7 +237,7 @@ def generate_id_plot(save_path_id ,save_dir, ages_id):
     xlim = xlim - (xlim*0.05)
     ages = ages_id
     pad = 5 # in points
-    fig, axs = plt.subplots(len(ages), len(ages), sharex=True, sharey=True, figsize = (10,8), dpi=300)
+    fig, axs = plt.subplots(len(ages), len(ages), sharex=True, sharey=True, figsize = figsize, dpi=300)
     for i, age1 in enumerate(ages):
         df_age = df[df.age1==age1]
         for j, age2 in enumerate(ages):
@@ -324,55 +380,6 @@ def run_id_evaluation(
     del G
 
 
-@click.command()
-@click.option('--network_folder', help='Network folder name', required=True)
-@click.option('--network', help='Network folder name', default=None, required=False)
-@click.option('--seed', help='Seed to generate from', default=42, required=False, type=int)
-@click.option('--trunc', 'truncation_psi', type=float, help='Truncation psi', default=1, show_default=True)
-@click.option('--trunc-cutoff', 'truncation_cutoff', type=int, help='Truncation cutoff', default=14, show_default=True)
-@click.option('--create_graph', help="Whether to generate a graph", default=True, type=bool)
-@click.option('--run_eval', help='Whether to run evaluation loop', default=True, type=bool)
-@click.option('--no-img', help='Number of random seeds to generate synthetic images from', default=10, type=int)
-@click.option('--model_name', help='Age model used', default="coral", type=str)
-
-def evaluate(
-    network_folder: str,
-    network: str,
-    seed: int,
-    truncation_psi: float,
-    truncation_cutoff: int,
-    create_graph: bool,
-    run_eval: bool,
-    no_img: int,
-    model_name: str,
-
-    ):
-    ## LOADING NETWORK ##
-    print(f'Loading networks from "{network_folder}"...')
-    device = torch.device('cuda')
-    seeds = np.random.randint(1,100000, size=no_img)
-    if network is not None: # choose specific network
-        network_pkl = network
-    else: # choose the network trained the longest
-        pkls = [string for string in os.listdir(network_folder) if '.pkl' in string]
-        pkls = sorted(pkls)
-        network_pkl = pkls[-1]
-    
-    ages = np.round(np.linspace(16,70,9))
-    ages_id = np.linspace(5,80,6)
-    angles_p = [0.3, 0, -0.3]
-    angles_y = [.4, 0, -.4]
-    if run_eval:
-        run_age_evaluation(model_name, ages, angles_p, angles_y, network_folder, network_pkl, seed, device, truncation_cutoff, truncation_psi, seeds)
-        run_id_evaluation(ages_id, network_folder, network_pkl, seed, device, truncation_cutoff, truncation_psi, seeds)
-    
-    save_dir = os.path.join("Evaluations", network_folder.split("/")[-1])
-    save_path_age = os.path.join(save_dir, "age_evaluation.csv")
-    save_path_id = os.path.join(save_dir, "id_evaluation.csv")
-
-    if create_graph:
-        generate_age_plot(save_path_age, save_dir, ages, angles_p, angles_y)
-        generate_id_plot(save_path_id ,save_dir, ages_id)
 
 if __name__ == "__main__":
     evaluate()
