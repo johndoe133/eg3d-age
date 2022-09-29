@@ -26,6 +26,17 @@ from training import training_loop
 from metrics import metric_main
 from torch_utils import training_stats
 from torch_utils import custom_ops
+import ast
+
+#----------------------------------------------------------------------------
+
+class PythonLiteralOption(click.Option):
+
+    def type_cast_value(self, ctx, value):
+        try:
+            return ast.literal_eval(value)
+        except:
+            raise click.BadParameter(value)
 
 #----------------------------------------------------------------------------
 
@@ -212,7 +223,7 @@ def parse_comma_separated_list(s):
 @click.option('--age_loss_fn',    help='Type of age loss function', metavar='STR', default="MSE", required=False)
 @click.option('--batch_division', help='If batch should be divided in half and doubled again so that there is two of each id', metavar='BOOL', default=False, required=False)
 @click.option('--freeze', help='Freeze parameters of volume synthesis and super resolution modules', metavar='BOOL', default=False, required=False)
-@click.option('--categories', help='Number of age categories, 0 or 1 means scalar', metavar='INT', default=1, required=False)
+# @click.option('--categories', help='Age categories', cls=PythonLiteralOption, required=False)
 
 
 def main(**kwargs):
@@ -278,7 +289,7 @@ def main(**kwargs):
     c.age_loss_fn = opts.age_loss_fn
     c.batch_division = opts.batch_division
     c.freeze = opts.freeze
-    c.categories = opts.categories
+    # c.categories = opts.categories
 
     # Sanity checks.
     if c.batch_size % c.num_gpus != 0:
