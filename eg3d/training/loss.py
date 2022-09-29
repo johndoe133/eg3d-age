@@ -60,6 +60,7 @@ class StyleGAN2Loss(Loss):
         self.age_model = AgeEstimator()
         self.age_loss_MSE = torch.nn.MSELoss()
         self.age_loss_L1 = torch.nn.L1Loss()
+        self.cross_entropy_loss = torch.nn.CrossEntropyLoss()
         self.cosine_sim = torch.nn.CosineSimilarity()
         self.id_model = FaceIDLoss(device)
         # self.id_model = InceptionResnetV1(pretrained='vggface2', device=device).requires_grad_(requires_grad=False).eval()
@@ -89,6 +90,19 @@ class StyleGAN2Loss(Loss):
             loss = self.age_loss_MSE(predicted_ages, ages) 
         elif loss =="MAE" or loss=="L1":
             loss = self.age_loss_L1(predicted_ages, ages)
+        elif loss =="CAT":
+            # ages should go from being:
+            # [[0,0,1],
+            #  [0,1,0],
+            #  [1,0,0],...]
+            # to 
+            # [2,1,0,...]
+            ages = c[:,25:].clone()
+            _, ages = ages.max(dim=0)
+
+            loss = self.cross_entropy_loss(predicted_ages, ages)
+
+
         else:
             raise NotImplementedError
         return loss
