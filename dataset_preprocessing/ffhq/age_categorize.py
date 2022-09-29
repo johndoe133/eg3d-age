@@ -28,9 +28,11 @@ def calc_age_category_from_json(dataset, categories=[5,10,20,30,40,50,60,80], no
         # in order to have it one hot encoded
         age_category = list(np.logical_and(age < categories[1:], age > categories[:-1]))
         age_category += [False]
-        age_category = list(map(int, age_category))
+        age_category = list(map(float, age_category))
 
-        data_category['labels'] += [image[0], image[1][:-1] + age_category]
+        data_category['labels'] += [[image[0], image[1][:-1] + age_category]]
+    
+    data_category['categories'] = list(categories)
     
     dataset_dir = os.path.split(dataset)[0]
     file_location = os.path.join(dataset_dir, "dataset_categories.json")
