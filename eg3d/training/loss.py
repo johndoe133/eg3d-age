@@ -17,7 +17,7 @@ from torch_utils import training_stats
 from torch_utils.ops import conv2d_gradfix
 from torch_utils.ops import upfirdn2d
 from training.dual_discriminator import filtered_resizing
-from training.estimate_age import AgeEstimator
+from training.estimate_age import AgeEstimator, AgeEstimatorNew
 import time
 from training.face_id import FaceIDLoss
 import random
@@ -62,7 +62,7 @@ class StyleGAN2Loss(Loss):
         self.age_loss_L1 = torch.nn.L1Loss()
         self.cosine_sim = torch.nn.CosineSimilarity()
         self.id_model = FaceIDLoss(device)
-        # self.id_model = InceptionResnetV1(pretrained='vggface2', device=device).requires_grad_(requires_grad=False).eval()
+        self.age_model_new = AgeEstimatorNew(self.device)
         assert self.gpc_reg_prob is None or (0 <= self.gpc_reg_prob <= 1)
 
 
@@ -110,7 +110,7 @@ class StyleGAN2Loss(Loss):
             total_loss += loss
 
         return total_loss
-    def run_id_loss(self, imgs, z, c, c_swapped, neural_rendering_resolution, margin=0.2, loss='MSE', update_emas=False):
+    def run_id_loss(self, imgs, z, c, c_swapped, neural_rendering_resolution, margin=0.2, loss='MSE', update_emas=False, slope=10):
         """Returns the identity loss of a subject by comparing the given images to the 
         images aged and young-ified. 
         
@@ -143,10 +143,8 @@ class StyleGAN2Loss(Loss):
         if loss=='MSE':
             return self.age_loss_MSE(latent_coords, new_latent_coords)
         elif loss == 'cosine_similarity':
-            constant = 1e-8
-            cos = 1 + self.cosine_sim(latent_coords, new_latent_coords) + constant
-            l = - torch.tensor([10], device=self.device) * cos + torch.tensor([20], device=self.device) # linear loss
-            # l = - torch.tensor(cos) + torch.log10(torch.tensor([2 + constant], device=self.device))
+            cos = self.cosine_sim(latent_coords, new_latent_coords)
+            l = - torch.tensor([slope], device=self.device) * cos + torch.tensor([slope], device=self.device) # linear loss
             return l.mean()
         else:
             raise NotImplementedError
@@ -222,9 +220,9 @@ class StyleGAN2Loss(Loss):
                 gen_logits = self.run_D(gen_img, gen_c, blur_sigma=blur_sigma)
                 age_loss = self.run_age_loss(gen_img, gen_c, loss=age_loss_fn)
                 age_loss_scaled = age_loss * age_scale # age scaling
-                
+                self.age_model_new.estimate_age(gen_img)
                 if not batch_division:
-                    id_loss = self.run_id_loss(gen_img, gen_z, gen_c, c_swapped, neural_rendering_resolution, loss='cosine_similarity', margin=0.2)
+                    id_loss = self.run_id_loss(gen_img, gen_z, gen_c, c_swapped, neural_rendering_resolution, loss='cosine_similarity', margin=0.2, slope=10)
                 else:
                     id_loss = self.run_id_loss2(gen_img, gen_z, gen_c, loss='cosine_similarity')
                 id_loss_scaled = id_loss * id_scale # id scaling
