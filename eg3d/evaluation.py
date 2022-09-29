@@ -163,13 +163,13 @@ def generate_age_plot(save_path,save_dir, ages, angles_p, angles_y):
 
     for ax, angle in zip(axs[0], angles_y):
         text = f"$Angle_y$={angle}"
-        ax.annotate(text, xy=(0.5, 1), xytext=(0, pad),
+        ax.annotate(text, xy=(0.5, 1), xytext=(0, pad), 
                     xycoords='axes fraction', textcoords='offset points',
                     size='large', ha='center', va='baseline')
 
     for ax, angle in zip(axs[:,0], angles_p):
         text = f"$Angle_p$={angle}"
-        ax.annotate(text, xy=(0, 0.5), xytext=(-ax.yaxis.labelpad - pad, 0),
+        ax.annotate(text, xy=(0, 0.5), xytext=(-ax.yaxis.labelpad - pad, 0), rotation=90,
                     xycoords=ax.yaxis.label, textcoords='offset points',
                     size='large', ha='right', va='center')
         
