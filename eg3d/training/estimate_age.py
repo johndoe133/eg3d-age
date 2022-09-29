@@ -56,7 +56,9 @@ class AgeEstimatorNew():
             return predicted_ages
 
     def estimate_age_rgb(self, image, normalize = True):
+        #image = image.permute(0,2,3,1)
         detections = self.detect_faces(image)
+        image = image.type('torch.FloatTensor')
         crops = self.crop_images(detections, image)
         crops = crops.to(self.device)
         outputs = F.softmax(self.age_model(crops), dim=-1)
@@ -72,7 +74,6 @@ class AgeEstimatorNew():
             width, height = image.shape[0], image.shape[0]
             image = image.to(torch.uint8)
             image = image.cpu().numpy()
-            print(image.shape)
             detected = self.detector(image, 1)
             if len(detected) == 0:
                 # no face was found - use the whole image
@@ -92,13 +93,12 @@ class AgeEstimatorNew():
             yw1 = max(int(y1 - self.margin * h), 0)
             xw2 = min(int(x2 + self.margin * w), img_w - 1)
             yw2 = min(int(y2 + self.margin * h), img_h - 1)
-            print("crop:", yw1,yw2 + 1, xw1,xw2 + 1)
             face_crop = img_RGB[i][yw1:yw2 + 1, xw1:xw2 + 1, :]
             face_crop_resize = F.interpolate(face_crop.permute(2,0,1)[None,:,:,:], [224,224],  mode='bilinear', align_corners=True) 
             cropped[i] = face_crop_resize[0]
         return cropped
 
-    def normalize_ages(self, age, rmin = 5, rmax = 80, tmin = -1, tmax = 1):
+    def normalize_ages(self, age, rmin = 0, rmax = 100, tmin = -1, tmax = 1):
         z = ((age - rmin) / (rmax - rmin)) * (tmax - tmin) + tmin
         return torch.round(z, decimals=4)
 
