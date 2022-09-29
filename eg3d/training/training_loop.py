@@ -212,7 +212,7 @@ def training_loop(
     id_scale                = 1,        # Scales ID loss
     batch_division          = True,     # Batch size remains the same but the IDs in the batch is halfed and the remaining are then duplicated. 
     freeze                  = False,    # If True, freezes weights of the synthesis and super resolution modules
-    categories              = 1,        # 0 or 1 if age is a number, otherwise indicates how many age categories there are
+    categories              = None,      # Age categories. None if age is a scalar
 ):
     # Initialize.
     start_time = time.time()
@@ -254,7 +254,11 @@ def training_loop(
         with dnnlib.util.open_url(resume_pkl) as f:
             resume_data = legacy.load_network_pkl(f)
         for name, module in [('G', G), ('D', D), ('G_ema', G_ema)]:
-            misc.copy_params_and_buffers(resume_data[name], module, require_all=False, categories=categories)
+            if categories:
+                categ = categories
+            else:
+                categ = [0]
+            misc.copy_params_and_buffers(resume_data[name], module, require_all=False, categories=categ)
 
     if freeze:
         # freeze synthesis and superres weights
@@ -363,11 +367,11 @@ def training_loop(
             all_gen_c = [training_set.get_label(np.random.randint(len(training_set))) for _ in range(len(phases) * batch_size)]
             # replace age sampled from dataset.json with generated age between range
             rand_age = generate_age(5,80)
-            if categories > 1:
+            if len(categories) > 1:
                 age_category = list(np.logical_and(rand_age < categories[1:], rand_age > categories[:-1]))
                 age_category += [False]
                 age_category = list(map(int, age_category))
-                all_gen_c = [np.concatenate([gen_c_initial[:-1]] + age_category) for gen_c_initial in all_gen_c]
+                all_gen_c = [np.concatenate([gen_c_initial[:25], age_category]) for gen_c_initial in all_gen_c]
             else:
                 all_gen_c = [np.concatenate([gen_c_initial[:-1], rand_age]) for gen_c_initial in all_gen_c]
             
