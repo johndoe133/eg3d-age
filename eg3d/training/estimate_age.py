@@ -55,13 +55,16 @@ class AgeEstimatorNew():
         else:
             return predicted_ages
 
-    def estimate_age_rgb(self, image):
+    def estimate_age_rgb(self, image, normalize = True):
         detections = self.detect_faces(image)
         crops = self.crop_images(detections, image)
         crops = crops.to(self.device)
         outputs = F.softmax(self.age_model(crops), dim=-1)
         predicted_ages = (outputs * self.ages).sum(axis=-1)
-        return predicted_ages
+        if normalize:
+            return self.normalize_ages(predicted_ages)
+        else:
+            return predicted_ages
 
     def detect_faces(self, img_RGB):
         detections = [] # x1, y1, x2, y2, w, h 
