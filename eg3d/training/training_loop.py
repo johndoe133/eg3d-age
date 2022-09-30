@@ -136,7 +136,7 @@ def denormalize(z, rmin = 5, rmax = 80, tmin = -1, tmax = 1):
 #----------------------------------------------------------------------------
 
 def normalize(x, rmin = 5, rmax = 80, tmin = -1, tmax = 1):
-    """Transforms ages to be between -1 and 1
+    """Transforms ages ranging from rmin (e.g. 0 years) to rmax (e.g. 100 years) to be between -1 and 1.
 
     Args:
         x: input age
@@ -146,7 +146,7 @@ def normalize(x, rmin = 5, rmax = 80, tmin = -1, tmax = 1):
         tmax (int, optional): Defaults to 1.
 
     Returns:
-        normalized age
+        normalized age rounded to four decimals
     """
     #https://stats.stackexchange.com/questions/281162/scale-a-number-between-a-range 
     z = ((x - rmin) / (rmax - rmin)) * (tmax - tmin) + tmin
@@ -167,12 +167,10 @@ def generate_age(minimum, maximum, distribution = "uniform"):
     """
     
     if distribution == "uniform":
-        r = np.random.randint(minimum, maximum + 1, size=1) 
-        return normalize(r)
+        r = np.random.randint(minimum, maximum + 1, size=1)  
     elif distribution == "triangular":
         r = np.random.triangular(minimum, minimum + (maximum-minimum) // 2, size = 1) 
-        return normalize(r)
-
+    return normalize(r, rmin=minimum, rmax=maximum)
 #----------------------------------------------------------------------------
 
 def training_loop(
@@ -214,6 +212,8 @@ def training_loop(
     batch_division          = True,     # Batch size remains the same but the IDs in the batch is halfed and the remaining are then duplicated. 
     freeze                  = False,    # If True, freezes weights of the synthesis and super resolution modules,
     age_version             = 'v2',     # Which version of the age estimator to use
+    age_min                 = 0,        # Minimum age generated for training
+    age_max                 = 100,      # Maximum age generated for training
 ):
     # Initialize.
     start_time = time.time()
@@ -294,6 +294,8 @@ def training_loop(
         print('Setting up training phases...')
     loss = dnnlib.util.construct_class_by_name(device=device, G=G, D=D, augment_pipe=augment_pipe, **loss_kwargs) # subclass of training.loss.Loss
     phases = []
+    if rank == 0:
+        print(f"Generating ages between: Minimum age: {age_min} and maximum age: {age_max}...")
     for name, module, opt_kwargs, reg_interval in [('G', G, G_opt_kwargs, G_reg_interval), ('D', D, D_opt_kwargs, D_reg_interval)]:
         if reg_interval is None:
             opt = dnnlib.util.construct_class_by_name(params=module.parameters(), **opt_kwargs) # subclass of torch.optim.Optimizer
@@ -369,7 +371,7 @@ def training_loop(
                     all_gen_c_new.append(element)
                     all_gen_c_new.append(element)
                 # replace age sampled from dataset.json with generated age between range
-                all_gen_c = [np.concatenate([gen_c_initial[:-1], generate_age(5, 80)]) for gen_c_initial in all_gen_c_new]
+                all_gen_c = [np.concatenate([gen_c_initial[:-1], generate_age(age_min, age_max)]) for gen_c_initial in all_gen_c_new]
             else:
                 all_gen_z = torch.randn([len(phases) * batch_size, G.z_dim], device=device)
                 all_gen_z = [phase_gen_z.split(batch_gpu) for phase_gen_z in all_gen_z.split(batch_size)]
@@ -398,7 +400,7 @@ def training_loop(
             for real_img, real_c, gen_z, gen_c in zip(phase_real_img, phase_real_c, phase_gen_z, phase_gen_c):
                 loss.accumulate_gradients(phase=phase.name, real_img=real_img, real_c=real_c, gen_z=gen_z, gen_c=gen_c, 
                                            gain=phase.interval, cur_nimg=cur_nimg, age_scale=age_scale, age_loss_fn = age_loss_fn, 
-                                           id_scale=id_scale, batch_division=batch_division, age_version=age_version)
+                                           id_scale=id_scale, batch_division=batch_division)
             phase.module.requires_grad_(False)
 
             # Update weights.

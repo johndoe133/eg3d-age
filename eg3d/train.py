@@ -211,6 +211,8 @@ def parse_comma_separated_list(s):
 @click.option('--batch_division', help='If batch should be divided in half and doubled again so that there is two of each id', metavar='BOOL', default=False, required=False)
 @click.option('--freeze', help='Freeze parameters of volume synthesis and super resolution modules', metavar='BOOL', default=False, required=False)
 @click.option('--age_version', help='What version of the age estimator to use', type=str, default="v2", required=False)
+@click.option('--age_min', help='Minimum age to generate random ages from', type=int, default=0, required=False)
+@click.option('--age_max', help='Maximum age to generate random ages from', type=int, default=100, required=False)
 
 
 def main(**kwargs):
@@ -277,6 +279,8 @@ def main(**kwargs):
     c.batch_division = opts.batch_division
     c.freeze = opts.freeze
     c.loss_kwargs.age_version = opts.age_version
+    c.age_min = opts.age_min
+    c.age_max = opts.age_max
 
     # Sanity checks.
     if c.batch_size % c.num_gpus != 0:
