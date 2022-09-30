@@ -296,6 +296,7 @@ def training_loop(
     phases = []
     if rank == 0:
         print(f"Generating ages between: Minimum age: {age_min} and maximum age: {age_max}...")
+        print(f"Using age_estimator version: {age_version}")
     for name, module, opt_kwargs, reg_interval in [('G', G, G_opt_kwargs, G_reg_interval), ('D', D, D_opt_kwargs, D_reg_interval)]:
         if reg_interval is None:
             opt = dnnlib.util.construct_class_by_name(params=module.parameters(), **opt_kwargs) # subclass of torch.optim.Optimizer
