@@ -17,9 +17,6 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 import os
-import requests
-from requests.adapters import HTTPAdapter
-
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -33,15 +30,16 @@ class FaceIDLoss:
     def get_feature_vector(self, img):
         if self.resize_img:
             img_resize = self.resize(img)
+        else:
+            img_resize = img # no change
         img_RGB = self.transform_to_RGB(img_resize)
         feature_vector = self.id_model(img_RGB)
         return feature_vector
 
     def transform_to_RGB(self, img):
-        lo, hi = torch.min(img).item(), torch.max(img).item() 
-        # adjust pixel values to 0 - 255
-        img255 = (img - lo) * (255 / (hi - lo))
-        return img255.floor()
+        img255 = (img * 127.5 + 128).clamp(0, 255).to(torch.uint8)
+
+        return img255.float()
 
     def resize(self, img):
         """Resize image tensor to fit age model

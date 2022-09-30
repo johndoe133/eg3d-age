@@ -3,11 +3,19 @@ import click
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
-import matplotlib
 import pandas as pd
 import json
 from combine_runs import combine_runs
 
+def plot_setup():
+    import matplotlib
+    matplotlib.use("pgf")
+    matplotlib.rcParams.update({
+        "pgf.texsystem": "pdflatex",
+        'font.family': 'serif',
+        'text.usetex': True,
+        'pgf.rcfonts': False,
+    })
 
 def compute_figsize(pt_x, pt_y):
     px = 1/72  # pixel in inches'
@@ -43,15 +51,7 @@ def generate_images(
         combine_runs(training_run, 'stats.jsonl')
         combine_runs(training_run, 'metric-fid50k_full.jsonl')
     
-    matplotlib.use("pgf")
-    matplotlib.rcParams.update({
-        "pgf.texsystem": "pdflatex",
-        'font.family': 'serif',
-        'text.usetex': True,
-        'pgf.rcfonts': False,
-    })
-
-    
+    plot_setup()
 
     print(f'Creating plots for training run folder:"{training_run}"...')
     #Load data 

@@ -17,7 +17,7 @@ from torch_utils import training_stats
 from torch_utils.ops import conv2d_gradfix
 from torch_utils.ops import upfirdn2d
 from training.dual_discriminator import filtered_resizing
-from training.estimate_age import AgeEstimator
+from training.estimate_age import AgeEstimator, AgeEstimatorNew
 import time
 from training.face_id import FaceIDLoss
 import random
@@ -31,7 +31,12 @@ class Loss:
 #----------------------------------------------------------------------------
 
 class StyleGAN2Loss(Loss):
-    def __init__(self, device, G, D, augment_pipe=None, r1_gamma=10, style_mixing_prob=0, pl_weight=0, pl_batch_shrink=2, pl_decay=0.01, pl_no_weight_grad=False, blur_init_sigma=0, blur_fade_kimg=0, r1_gamma_init=0, r1_gamma_fade_kimg=0, neural_rendering_resolution_initial=64, neural_rendering_resolution_final=None, neural_rendering_resolution_fade_kimg=0, gpc_reg_fade_kimg=1000, gpc_reg_prob=None, dual_discrimination=False, filter_mode='antialiased'):
+    def __init__(self, device, G, D, augment_pipe=None, r1_gamma=10, style_mixing_prob=0, 
+                    pl_weight=0, pl_batch_shrink=2, pl_decay=0.01, pl_no_weight_grad=False, 
+                    blur_init_sigma=0, blur_fade_kimg=0, r1_gamma_init=0, r1_gamma_fade_kimg=0, 
+                    neural_rendering_resolution_initial=64, neural_rendering_resolution_final=None, 
+                    neural_rendering_resolution_fade_kimg=0, gpc_reg_fade_kimg=1000, gpc_reg_prob=None, 
+                    dual_discrimination=False, filter_mode='antialiased', age_version='v2'):
         super().__init__()
         self.device             = device
         self.G                  = G
@@ -57,13 +62,17 @@ class StyleGAN2Loss(Loss):
         self.filter_mode = filter_mode
         self.resample_filter = upfirdn2d.setup_filter([1,3,3,1], device=device)
         self.blur_raw_target = True
-        self.age_model = AgeEstimator()
         self.age_loss_MSE = torch.nn.MSELoss()
         self.age_loss_L1 = torch.nn.L1Loss()
         self.cross_entropy_loss = torch.nn.CrossEntropyLoss()
         self.cosine_sim = torch.nn.CosineSimilarity()
         self.id_model = FaceIDLoss(device)
-        # self.id_model = InceptionResnetV1(pretrained='vggface2', device=device).requires_grad_(requires_grad=False).eval()
+        self.age_version = age_version
+        if age_version == 'v1':
+            self.age_model = AgeEstimator()
+        elif age_version == "v2":
+            self.age_model = AgeEstimatorNew(self.device)
+            
         assert self.gpc_reg_prob is None or (0 <= self.gpc_reg_prob <= 1)
 
 
@@ -124,7 +133,7 @@ class StyleGAN2Loss(Loss):
             total_loss += loss
 
         return total_loss
-    def run_id_loss(self, imgs, z, c, c_swapped, neural_rendering_resolution, margin=0.2, loss='MSE', update_emas=False):
+    def run_id_loss(self, imgs, z, c, c_swapped, neural_rendering_resolution, margin=0.2, loss='MSE', update_emas=False, slope=10):
         """Returns the identity loss of a subject by comparing the given images to the 
         images aged and young-ified. 
         
@@ -157,10 +166,8 @@ class StyleGAN2Loss(Loss):
         if loss=='MSE':
             return self.age_loss_MSE(latent_coords, new_latent_coords)
         elif loss == 'cosine_similarity':
-            constant = 1e-8
-            cos = 1 + self.cosine_sim(latent_coords, new_latent_coords) + constant
-            l = - torch.tensor([10], device=self.device) * cos + torch.tensor([20], device=self.device) # linear loss
-            # l = - torch.tensor(cos) + torch.log10(torch.tensor([2 + constant], device=self.device))
+            cos = self.cosine_sim(latent_coords, new_latent_coords)
+            l = - torch.tensor([slope], device=self.device) * cos + torch.tensor([slope], device=self.device) # linear loss
             return l.mean()
         else:
             raise NotImplementedError
@@ -236,9 +243,8 @@ class StyleGAN2Loss(Loss):
                 gen_logits = self.run_D(gen_img, gen_c, blur_sigma=blur_sigma)
                 age_loss = self.run_age_loss(gen_img, gen_c, loss=age_loss_fn)
                 age_loss_scaled = age_loss * age_scale # age scaling
-                
                 if not batch_division:
-                    id_loss = self.run_id_loss(gen_img, gen_z, gen_c, c_swapped, neural_rendering_resolution, loss='cosine_similarity', margin=0.2)
+                    id_loss = self.run_id_loss(gen_img, gen_z, gen_c, c_swapped, neural_rendering_resolution, loss='cosine_similarity', margin=0.2, slope=10)
                 else:
                     id_loss = self.run_id_loss2(gen_img, gen_z, gen_c, loss='cosine_similarity')
                 id_loss_scaled = id_loss * id_scale # id scaling
