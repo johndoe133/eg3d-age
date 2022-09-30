@@ -32,44 +32,70 @@ class AgeEstimatorNew():
         self.img_size = 224
         self.ages = torch.arange(0,101, device = self.device)
     
-    def estimate_age(self, gen_img, normalize = True):
+    def estimate_age(self, gen_img, normalize = True, crop=False):
         """Takes output of G.synthesis and estimates the age of the synthetic person.
+        Input shape is [batch_size, channels, w, h]. Images are crop based on the detections.
+        The cropped images are converted to BGR and estimated using a pretrained age estimator.
 
         Args:
             gen_img (tensor): image
-
+            normalized (bool): true if the output age should be normalized. Default is true.
+            crop (bool): whether to crop the images before doing age estimation. Default is False. 
         Returns:
             tensor: age
         """
-        img = gen_img['image']
-        img_RGB = (img * 127.5 + 128).clamp(0, 255)
-        img_RGB = img_RGB.permute(0,2,3,1) # to fit detector input shape
-        img_RGB_detached = img_RGB.detach()
-        detections = self.detect_faces(img_RGB_detached)
-        crops = self.crop_images(detections, img_RGB)
+        img_RGB = (gen_img * 127.5 + 128).clamp(0, 255) # rescale image to be between 0 and 255
+        if crop:
+            img_RGB_detached = img_RGB.detach() 
+            detections = self.detect_faces(img_RGB_detached)
+            crops = self.crop_images(detections, img_RGB)
+        else:
+            # resize to fit age model
+            crops = F.interpolate(img_RGB, [224,224],  mode='bilinear', align_corners=True) 
         crops = crops.to(self.device)
-        outputs = F.softmax(self.age_model(crops), dim=-1)
+        crops_BGR = crops.flip([1]) # convert to BGR
+        outputs = F.softmax(self.age_model(crops_BGR), dim=-1)
         predicted_ages = (outputs * self.ages).sum(axis=-1)
         if normalize:
             return self.normalize_ages(predicted_ages)
         else:
             return predicted_ages
 
-    def estimate_age_rgb(self, image, normalize = True):
-        #image = image.permute(0,2,3,1)
-        detections = self.detect_faces(image)
+    def estimate_age_rgb(self, image, normalize = True, crop = False):
         image = image.type('torch.FloatTensor')
-        crops = self.crop_images(detections, image)
+        detections = self.detect_faces(image)
+        if crop:
+            crops = self.crop_images(detections, image)
+        else:
+            crops = F.interpolate(image.permute(0,3,1,2), [224,224],  mode='bilinear', align_corners=True) 
         crops = crops.to(self.device)
-        outputs = F.softmax(self.age_model(crops), dim=-1)
+        crops_BGR = crops.flip([1])
+        outputs = F.softmax(self.age_model(crops_BGR), dim=-1)
         predicted_ages = (outputs * self.ages).sum(axis=-1)
         if normalize:
             return self.normalize_ages(predicted_ages)
         else:
             return predicted_ages
+
+    def estimate_age_testing(self, image):
+        outputs = F.softmax(self.age_model(image), dim=-1)
+        predicted_ages = (outputs * self.ages).sum(axis=-1)
+        return predicted_ages
 
     def detect_faces(self, img_RGB):
+        """Detects faces using `dlib.get_frontal_face_detector()`. Return a list
+        of coordinates used to crop the image. Images are resized to 640 x 640 before
+        detection.
+
+        Args:
+            img_RGB (tensor): input shape [batch_size, channels, w, h]
+
+        Returns:
+            list: detections
+        """
         detections = [] # x1, y1, x2, y2, w, h 
+        img_RGB = F.interpolate(img_RGB, [640, 640],  mode='bilinear', align_corners=False) 
+        img_RGB = img_RGB.permute(0,2,3,1) # converted to shape [batch_size, w, h, channels] to fit dlib detector
         for image in img_RGB: # iterate over the batch
             width, height = image.shape[0], image.shape[0]
             image = image.to(torch.uint8)
@@ -85,16 +111,27 @@ class AgeEstimatorNew():
         return detections
 
     def crop_images(self, detections, img_RGB):
-        batch_size, img_w, img_h, channels = img_RGB.shape[0],img_RGB.shape[1],img_RGB.shape[2],img_RGB.shape[3]
+        """Crops the images using predetermined coordinates from `detect_faces`.
+        Resizes the cropped image to fit the age model.
+
+        Args:
+            detections (list): list of detections
+            img_RGB (tensor):  input shape [batch_size, channels, w, h]
+
+        Returns:
+            tensor: tensor of images cropped and resized to fit age model
+        """
+        batch_size, channels , img_w, img_h = img_RGB.shape[0] , img_RGB.shape[1], img_RGB.shape[2], img_RGB.shape[3]
         cropped = torch.empty(batch_size, channels, self.img_size, self.img_size)
         for i in range(batch_size):
-            x1, y1, x2, y2, w, h = detections[0]
+            
+            x1, y1, x2, y2, w, h = detections[i]
             xw1 = max(int(x1 - self.margin * w), 0)
             yw1 = max(int(y1 - self.margin * h), 0)
             xw2 = min(int(x2 + self.margin * w), img_w - 1)
             yw2 = min(int(y2 + self.margin * h), img_h - 1)
-            face_crop = img_RGB[i][yw1:yw2 + 1, xw1:xw2 + 1, :]
-            face_crop_resize = F.interpolate(face_crop.permute(2,0,1)[None,:,:,:], [224,224],  mode='bilinear', align_corners=True) 
+            face_crop = img_RGB[i][:, yw1:yw2 + 1, xw1:xw2 + 1]
+            face_crop_resize = F.interpolate(face_crop[None,:,:,:], [224,224],  mode='bilinear', align_corners=False) 
             cropped[i] = face_crop_resize[0]
         return cropped
 
@@ -160,5 +197,19 @@ def get_model(model_name="se_resnext50_32x4d", num_classes=101, pretrained="imag
     model.last_linear = nn.Linear(dim_feats, num_classes)
     model.avg_pool = nn.AdaptiveAvgPool2d(1)
     return model
+
 if __name__ == "__main__":
-    age = AgeEstimator()
+    age_model = AgeEstimatorNew(torch.device("cuda"))
+    p = "/zhome/d7/6/127158/Documents/eg3d-age/age-estimation-pytorch/in"
+    
+    for path in sorted(os.listdir(os.path.join(p))):
+        if 'dataset' in path:
+            continue
+        image_path = os.path.join(p, path)
+        image = cv2.imread(image_path)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        img_tensor = torch.from_numpy(image)
+        img_tensor = img_tensor.to("cuda:0")
+        predicted_age = age_model.estimate_age_rgb(img_tensor[None,:,:,:], crop=True, normalize=False).item()
+        print(path, "age:",predicted_age)
+        
