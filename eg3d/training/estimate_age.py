@@ -63,8 +63,9 @@ class AgeEstimatorNew():
 
     def estimate_age_rgb(self, image, normalize = True, crop = False):
         image = image.type('torch.FloatTensor')
-        detections = self.detect_faces(image)
         if crop:
+            detections = self.detect_faces(image)
+            image = image.permute(0,3,1,2)
             crops = self.crop_images(detections, image)
         else:
             crops = F.interpolate(image.permute(0,3,1,2), [224,224],  mode='bilinear', align_corners=True) 
@@ -93,9 +94,13 @@ class AgeEstimatorNew():
         Returns:
             list: detections
         """
+        img_RGB = img_RGB.permute(0,3,1,2)
+        
         detections = [] # x1, y1, x2, y2, w, h 
         img_RGB = F.interpolate(img_RGB, [640, 640],  mode='bilinear', align_corners=False) 
+        
         img_RGB = img_RGB.permute(0,2,3,1) # converted to shape [batch_size, w, h, channels] to fit dlib detector
+        
         for image in img_RGB: # iterate over the batch
             width, height = image.shape[0], image.shape[0]
             image = image.to(torch.uint8)
@@ -108,6 +113,7 @@ class AgeEstimatorNew():
                 d = detected[0]
                 x1, y1, x2, y2, w, h = d.left(), d.top(), d.right() + 1, d.bottom() + 1, d.width(), d.height()
             detections.append([x1, y1, x2, y2, w, h])
+    
         return detections
 
     def crop_images(self, detections, img_RGB):
