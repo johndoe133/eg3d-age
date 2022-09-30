@@ -4,14 +4,14 @@ import json
 import numpy as np
 from tqdm import tqdm
 
-def normalize(x, rmin = 5, rmax = 80, tmin = -1, tmax = 1):
+def normalize(x, rmin = 0, rmax = 100, tmin = -1, tmax = 1):
     z = ((x - rmin) / (rmax - rmin)) * (tmax - tmin) + tmin
     return round(z, 4)
 
 def calc_age_category(network, dataset):
     return 0
 
-def calc_age_category_from_json(dataset, categories=[5,10,20,30,40,50,60,80], normalized=True):
+def calc_age_category_from_json(dataset, categories=[0,5,10,15,20,30,45,60,80,100], normalized=True):
     f = open(dataset)
     data = json.load(f)['labels']
     data_category = dict({'labels': []})
