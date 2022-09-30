@@ -26,6 +26,17 @@ from training import training_loop
 from metrics import metric_main
 from torch_utils import training_stats
 from torch_utils import custom_ops
+import ast
+
+#----------------------------------------------------------------------------
+
+class PythonLiteralOption(click.Option):
+
+    def type_cast_value(self, ctx, value):
+        try:
+            return ast.literal_eval(value)
+        except:
+            raise click.BadParameter(value)
 
 #----------------------------------------------------------------------------
 
@@ -205,6 +216,8 @@ def parse_comma_separated_list(s):
 @click.option('--density_reg_p_dist',    help='density regularization strength.', metavar='FLOAT', type=click.FloatRange(min=0), default=0.004, required=False, show_default=True)
 @click.option('--reg_type', help='Type of regularization', metavar='STR',  type=click.Choice(['l1', 'l1-alt', 'monotonic-detach', 'monotonic-fixed', 'total-variation']), required=False, default='l1')
 @click.option('--decoder_lr_mul',    help='decoder learning rate multiplier.', metavar='FLOAT', type=click.FloatRange(min=0), default=1, required=False, show_default=True)
+
+# Age settings
 @click.option('--age_scale',    help='Scales age loss.', metavar='FLOAT', default=1.0, required=False, show_default=True)
 @click.option('--id_scale',    help='Scales id loss.', metavar='FLOAT', default=10.0, required=False, show_default=True)
 @click.option('--age_loss_fn',    help='Type of age loss function', metavar='STR', default="MSE", required=False)
@@ -213,7 +226,7 @@ def parse_comma_separated_list(s):
 @click.option('--age_version', help='What version of the age estimator to use', type=str, default="v2", required=False)
 @click.option('--age_min', help='Minimum age to generate random ages from', type=int, default=0, required=False)
 @click.option('--age_max', help='Maximum age to generate random ages from', type=int, default=100, required=False)
-
+@click.option('--categories', help='Age categories', cls=PythonLiteralOption, required=False)
 
 def main(**kwargs):
     """Train a GAN using the techniques described in the paper
@@ -281,6 +294,7 @@ def main(**kwargs):
     c.loss_kwargs.age_version = opts.age_version
     c.age_min = opts.age_min
     c.age_max = opts.age_max
+    c.categories = opts.categories
 
     # Sanity checks.
     if c.batch_size % c.num_gpus != 0:

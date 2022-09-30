@@ -4,8 +4,10 @@ import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 import json
+from tqdm import tqdm
+import time
 
-root = r"./datasets/FFHQ_512_6_balanced"
+root = r"/work3/s174379/datasets/FFHQ_512_18"
 path = os.path.join(root, "dataset_ages.json")
 
 
@@ -31,20 +33,16 @@ def bgr_to_rgb(image):
 ages = []
 with open(path) as json_file:
     data = json.load(json_file)
-    faces = np.array(data['labels'])
+    faces = data['labels']
     data_copy = {"labels":[]}
     faces_copy = []
-    for i, face in enumerate(faces):
+    for face in tqdm(faces):
         image = face[0]
         c = face[1]
         age = normalize(c[-1])
         ages.append(age)
         c[-1] = age
         faces_copy.append([image, c])
-        if i%10==0:
-            print(i)
-            print(age)
-            print(image)
         
     data_copy["labels"] = faces_copy
     
