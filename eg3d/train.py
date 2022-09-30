@@ -210,6 +210,7 @@ def parse_comma_separated_list(s):
 @click.option('--age_loss_fn',    help='Type of age loss function', metavar='STR', default="MSE", required=False)
 @click.option('--batch_division', help='If batch should be divided in half and doubled again so that there is two of each id', metavar='BOOL', default=False, required=False)
 @click.option('--freeze', help='Freeze parameters of volume synthesis and super resolution modules', metavar='BOOL', default=False, required=False)
+@click.option('--age_version', help='What version of the age estimator to use', type=str, default="v2", required=False)
 
 
 def main(**kwargs):
@@ -275,6 +276,7 @@ def main(**kwargs):
     c.age_loss_fn = opts.age_loss_fn
     c.batch_division = opts.batch_division
     c.freeze = opts.freeze
+    c.loss_kwargs.age_version = opts.age_version
 
     # Sanity checks.
     if c.batch_size % c.num_gpus != 0:
