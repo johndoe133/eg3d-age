@@ -172,6 +172,23 @@ def generate_age(minimum, maximum, distribution = "uniform"):
     return normalize(r, rmin=minimum, rmax=maximum)
 #----------------------------------------------------------------------------
 
+def get_age_category(age, categories, normalize_category=True, rmin=5, rmax=80):
+    """
+    Returns the index of the first category number where age > categories[i]
+    """
+    if normalize_category:
+        categories = normalize(np.array(categories), rmin=rmin, rmax=rmax)
+    else:
+        categories = np.array(categories)
+    categories[0] = categories[0] - 0.001
+    categories[-1] = categories[-1] + 0.001
+    age_category = list(np.logical_and(age <= categories[1:], age > categories[:-1]))
+    age_category += [False]
+    age_category = list(map(int, age_category))
+    return age_category
+
+#----------------------------------------------------------------------------
+
 def training_loop(
     run_dir                 = '.',      # Output directory.
     training_set_kwargs     = {},       # Options for training set.
@@ -369,14 +386,10 @@ def training_loop(
             all_gen_z = [phase_gen_z.split(batch_gpu) for phase_gen_z in all_gen_z.split(batch_size)]
             all_gen_c = [training_set.get_label(np.random.randint(len(training_set))) for _ in range(len(phases) * batch_size)]
             # replace age sampled from dataset.json with generated age between range
-            rand_age = generate_age(5,80)
             if len(categories) > 1:
-                age_category = list(np.logical_and(rand_age < categories[1:], rand_age > categories[:-1]))
-                age_category += [False]
-                age_category = list(map(int, age_category))
-                all_gen_c = [np.concatenate([gen_c_initial[:25], age_category]) for gen_c_initial in all_gen_c]
+                all_gen_c = [np.concatenate([gen_c_initial[:25], get_age_category(generate_age(age_min, age_max), categories, rmin=age_min, rmax=age_max)]) for gen_c_initial in all_gen_c]
             else:
-                all_gen_c = [np.concatenate([gen_c_initial[:-1], rand_age]) for gen_c_initial in all_gen_c]
+                all_gen_c = [np.concatenate([gen_c_initial[:-1], generate_age(age_min, age_max)]) for gen_c_initial in all_gen_c]
             
             all_gen_c = torch.from_numpy(np.stack(all_gen_c)).pin_memory().to(device)
             all_gen_c = all_gen_c.float() # needed

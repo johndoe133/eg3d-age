@@ -21,6 +21,7 @@ from training.estimate_age import AgeEstimator, AgeEstimatorNew
 import time
 from training.face_id import FaceIDLoss
 import random
+from training.training_loop import normalize
 
 #----------------------------------------------------------------------------
 
@@ -36,7 +37,7 @@ class StyleGAN2Loss(Loss):
                     blur_init_sigma=0, blur_fade_kimg=0, r1_gamma_init=0, r1_gamma_fade_kimg=0, 
                     neural_rendering_resolution_initial=64, neural_rendering_resolution_final=None, 
                     neural_rendering_resolution_fade_kimg=0, gpc_reg_fade_kimg=1000, gpc_reg_prob=None, 
-                    dual_discrimination=False, filter_mode='antialiased', age_version='v2'):
+                    dual_discrimination=False, filter_mode='antialiased', age_version='v2', categories=[0]):
         super().__init__()
         self.device             = device
         self.G                  = G
@@ -72,6 +73,7 @@ class StyleGAN2Loss(Loss):
             self.age_model = AgeEstimator()
         elif age_version == "v2":
             self.age_model = AgeEstimatorNew(self.device)
+        self.categories = categories
             
         assert self.gpc_reg_prob is None or (0 <= self.gpc_reg_prob <= 1)
 
@@ -107,9 +109,14 @@ class StyleGAN2Loss(Loss):
             # to 
             # [2,1,0,...]
             ages = c[:,25:].clone()
-            _, ages = ages.max(dim=0)
+            _, ages = ages.max(dim=1)
 
-            loss = self.cross_entropy_loss(predicted_ages, ages)
+            buckets = torch.tensor(normalize(np.array(self.categories), rmin=0, rmax=100))
+            buckets = buckets.to(self.device)
+
+            pred_ages_cat = torch.bucketize(predicted_ages, buckets, right=True) - 1
+
+            loss = self.cross_entropy_loss(pred_ages_cat, ages)
 
 
         else:

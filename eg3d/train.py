@@ -295,6 +295,7 @@ def main(**kwargs):
     c.age_min = opts.age_min
     c.age_max = opts.age_max
     c.categories = opts.categories
+    c.loss_kwargs.categories = opts.categories
 
     # Sanity checks.
     if c.batch_size % c.num_gpus != 0:
