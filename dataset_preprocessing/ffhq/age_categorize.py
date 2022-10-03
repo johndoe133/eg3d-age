@@ -11,7 +11,7 @@ def normalize(x, rmin = 0, rmax = 100, tmin = -1, tmax = 1):
 def calc_age_category(network, dataset):
     return 0
 
-def calc_age_category_from_json(dataset, categories=[0,5,10,15,20,30,45,60,80,100], normalized=True):
+def calc_age_category_from_json(dataset, categories=[0,5,10,15,20,30,45,60,80,101], normalized=True):
     f = open(dataset)
     data = json.load(f)['labels']
     data_category = dict({'labels': []})
@@ -26,16 +26,18 @@ def calc_age_category_from_json(dataset, categories=[0,5,10,15,20,30,45,60,80,10
         # [False, False, True, False, False, False, False, False]
         # which is then mapped to [0,0,1,0,0,0,0,0]
         # in order to have it one hot encoded
-        age_category = list(np.logical_and(age < categories[1:], age > categories[:-1]))
-        age_category += [False]
-        age_category = list(map(float, age_category))
+        
+        age_category = np.digitize(age, categories, right=False) - 1
+        
+        age_category_list = [0.0] * (len(categories) - 1)
+        age_category_list[age_category] = 1.0
 
-        data_category['labels'] += [[image[0], image[1][:-1] + age_category]]
+        data_category['labels'] += [[image[0], image[1][:-1] + age_category_list]]
     
     data_category['categories'] = list(categories)
     
     dataset_dir = os.path.split(dataset)[0]
-    file_location = os.path.join(dataset_dir, "dataset_categories.json")
+    file_location = os.path.join(dataset_dir, "dataset_cat.json")
     print(f'saving file at {file_location}')
     out_file = open(file_location, "w")
     json.dump(data_category, out_file)
@@ -44,7 +46,7 @@ def calc_age_category_from_json(dataset, categories=[0,5,10,15,20,30,45,60,80,10
 
 @click.command()
 @click.option('--network', help='Network pickle filename or URL', metavar='PATH', required=False)
-@click.option('dataset_json', '--dataset_json', help='dataset.json location to base age categories off of', metavar='PATH', required=True)
+@click.option('dataset_json', '--d', help='dataset.json location to base age categories off of', metavar='PATH', required=True)
 @click.option('normalized', '--normalized', is_flag=True, help='Whether or not ages in dataset.json are normalized', default=True)
 def main(
     network: str, 
@@ -53,7 +55,7 @@ def main(
     ):
     print(network)
     print(dataset_json)
-    calc_age_category_from_json(dataset_json)
+    calc_age_category_from_json(dataset_json, normalized=normalized)
 
 
 

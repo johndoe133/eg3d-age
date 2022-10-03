@@ -114,7 +114,7 @@ def save_image_grid(img, fname, drange, grid_size, ages=None):
 
 #----------------------------------------------------------------------------
 
-def denormalize(z, rmin = 5, rmax = 80, tmin = -1, tmax = 1):
+def denormalize(z, rmin = 0, rmax = 100, tmin = -1, tmax = 1):
     """To go from the normalized ages ranged from -1 to 1 to actual ages.
     The normalization of the ages are based on a range age from 5 to 80 years 
     and so the denormalization is the same. 
@@ -180,11 +180,10 @@ def get_age_category(age, categories, normalize_category=True, rmin=5, rmax=80):
         categories = normalize(np.array(categories), rmin=rmin, rmax=rmax)
     else:
         categories = np.array(categories)
-    categories[0] = categories[0] - 0.001
-    categories[-1] = categories[-1] + 0.001
-    age_category = list(np.logical_and(age <= categories[1:], age > categories[:-1]))
-    age_category += [False]
-    age_category = list(map(int, age_category))
+    age_category = [0] * (len(categories) - 1)
+    age_category_index = np.digitize(age, categories, right=False) - 1
+    age_category_index = age_category_index[0]
+    age_category[age_category_index] = 1
     return age_category
 
 #----------------------------------------------------------------------------
@@ -230,7 +229,7 @@ def training_loop(
     age_version             = 'v2',     # Which version of the age estimator to use
     age_min                 = 0,        # Minimum age generated for training
     age_max                 = 100,      # Maximum age generated for training
-    categories              = None,      # Age categories. None if age is a scalar
+    categories              = None,     # Age categories. None if age is a scalar
 ):
     # Initialize.
     start_time = time.time()
@@ -265,18 +264,16 @@ def training_loop(
     G.register_buffer('dataset_label_std', torch.tensor(training_set.get_label_std()).to(device))
     D = dnnlib.util.construct_class_by_name(**D_kwargs, **common_kwargs).train().requires_grad_(False).to(device) # subclass of torch.nn.Module
     G_ema = copy.deepcopy(G).eval()
-
+    
     # Resume from existing pickle.
     if (resume_pkl is not None) and (rank == 0):
         print(f'Resuming from "{resume_pkl}"')
         with dnnlib.util.open_url(resume_pkl) as f:
             resume_data = legacy.load_network_pkl(f)
         for name, module in [('G', G), ('D', D), ('G_ema', G_ema)]:
-            if categories:
-                categ = categories
-            else:
-                categ = [0]
-            misc.copy_params_and_buffers(resume_data[name], module, require_all=False, categories=categ)
+            if categories is None:
+                categories = [0]
+            misc.copy_params_and_buffers(resume_data[name], module, require_all=False, categories=categories)
 
     if freeze:
         # freeze synthesis and superres weights
@@ -390,7 +387,7 @@ def training_loop(
                 all_gen_c = [np.concatenate([gen_c_initial[:25], get_age_category(generate_age(age_min, age_max), categories, rmin=age_min, rmax=age_max)]) for gen_c_initial in all_gen_c]
             else:
                 all_gen_c = [np.concatenate([gen_c_initial[:-1], generate_age(age_min, age_max)]) for gen_c_initial in all_gen_c]
-            
+
             all_gen_c = torch.from_numpy(np.stack(all_gen_c)).pin_memory().to(device)
             all_gen_c = all_gen_c.float() # needed
             all_gen_c = [phase_gen_c.split(batch_gpu) for phase_gen_c in all_gen_c.split(batch_size)]
