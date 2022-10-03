@@ -14,15 +14,21 @@ parser.add_argument("--gpu_mem", help="",default = 40, type=int)
 parser.add_argument("--logs_dir", help="",default = 'out')
 parser.add_argument("--batch_size", help="",default = 8, type=int)
 parser.add_argument("--gamma", help="",default = 5)
-parser.add_argument("--resume", help="",default = None)
+parser.add_argument("--resume", help="",default = 'networks/ffhqrebalanced512-128')
 parser.add_argument("--devices", help="",default = '0,1')
-parser.add_argument("--data", help="",default = '/work3/s174379/datasets/FFHQ_512_6_balanced')
+parser.add_argument("--data", help="",default = 'datasets/FFHQ_512_6_balanced')
 parser.add_argument("--age_scale", help="",default = '8')
 parser.add_argument("--age_loss_fn", help="", default="MSE")
-parser.add_argument("--id_scale", help="", default=1)
+parser.add_argument("--id_scale", help="", default=10)
 parser.add_argument("--snap", help="How many ticks between saving a snapshot", default=50)
 parser.add_argument("--batch_division", help="", default=False)
 parser.add_argument("--freeze", help="", default=False)
+parser.add_argument("--age_version", help="", default='v2')
+parser.add_argument("--age_min", help="",default=0)
+parser.add_argument("--age_max", help="",default=100)
+parser.add_argument("--neural_rendering_resolution_initial", help="", default=128)
+parser.add_argument("--categories", help="", default=[0])
+
 
 args = parser.parse_args()
 
@@ -70,6 +76,12 @@ submit_script = template_text.format(
                         "snap": args.snap,
                         "batch_division": args.batch_division,
                         "freeze": args.freeze,
+                        "age_version": args.age_version,
+                        "age_min": args.age_min,
+                        "age_max": args.age_max,
+                        "neural_rendering_resolution_initial" : args.neural_rendering_resolution_initial,
+                        "categories": args.categories,
+
                     }
                 )
 
