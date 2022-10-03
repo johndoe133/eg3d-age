@@ -17,7 +17,10 @@ import dlib
 import cv2
 
 class AgeEstimatorNew():
-    def __init__(self, device):
+    """Takes the device and a list of age categories as input. If age categories
+    are not used then the input should be `[0]`. 
+    """
+    def __init__(self, device, categories = [0]):
         root = os.path.expanduser('~')
         model = get_model(model_name=cfg.MODEL.ARCH, pretrained=None)
         self.age_model = model.to(device)
@@ -31,18 +34,23 @@ class AgeEstimatorNew():
         self.detector = dlib.get_frontal_face_detector()
         self.img_size = 224
         self.ages = torch.arange(0,101, device = self.device)
+        self.categories = categories
     
     def estimate_age(self, gen_img, normalize = True, crop=False):
         """Takes output of G.synthesis and estimates the age of the synthetic person.
         Input shape is [batch_size, channels, w, h]. Images are crop based on the detections.
         The cropped images are converted to BGR and estimated using a pretrained age estimator.
 
+        The method will return the sum of logits in an age range if categories are defined when
+        the module is initialized. E.g. if the categories are [0,5,50,101], the first 5 logits are
+        summed, the next 45 and the last 50. 
+
         Args:
             gen_img (tensor): image
             normalized (bool): true if the output age should be normalized. Default is true.
             crop (bool): whether to crop the images before doing age estimation. Default is False. 
         Returns:
-            tensor: age
+            tensor, tensor: predicted ages, logits
         """
         img_RGB = (gen_img * 127.5 + 128).clamp(0, 255) # rescale image to be between 0 and 255
         if crop:
@@ -54,12 +62,34 @@ class AgeEstimatorNew():
             crops = F.interpolate(img_RGB, [224,224],  mode='bilinear', align_corners=True) 
         crops = crops.to(self.device)
         crops_BGR = crops.flip([1]) # convert to BGR
-        outputs = F.softmax(self.age_model(crops_BGR), dim=-1)
+        logits = self.age_model(crops_BGR)
+        outputs = F.softmax(logits, dim=-1)
         predicted_ages = (outputs * self.ages).sum(axis=-1)
+
+        if len(self.categories) > 1:
+            logits = self.categorize_logits(logits)
+
         if normalize:
-            return self.normalize_ages(predicted_ages)
+            return self.normalize_ages(predicted_ages), logits
         else:
-            return predicted_ages
+            return predicted_ages, logits
+
+    def categorize_logits(self, logits):
+        """Will categorize the logits into the age ranges specified by the categories list
+        by summing the logits in each category.
+        Only relevant if `len(self.categories) > 1`, otherwise categories are unused. 
+
+        Args:
+            logits (tensor): raw output of the age model with the size [batch_size, 101]
+
+        Returns:
+            tensor: logits that are summed in the given categories.
+        """
+        batch, n = logits.shape
+        zeros = torch.zeros((batch, len(self.categories) - 1), device = self.device)
+        buckets = torch.bucketize(self.ages, torch.tensor(self.categories, device = self.device), right=True)
+        logits_categorized = zeros.index_add_(1, buckets - 1, logits)
+        return logits_categorized
 
     def estimate_age_rgb(self, image, normalize = True, crop = False):
         image = image.type('torch.FloatTensor')
