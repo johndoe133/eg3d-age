@@ -69,16 +69,16 @@ class StyleGAN2Loss(Loss):
         self.cosine_sim = torch.nn.CosineSimilarity()
         self.id_model = FaceIDLoss(device)
         self.age_version = age_version
+        self.categories = categories
         if age_version == 'v1':
             self.age_model = AgeEstimator()
         elif age_version == "v2":
-            self.age_model = AgeEstimatorNew(self.device)
-        self.categories = categories
+            self.age_model = AgeEstimatorNew(self.device, categories = self.categories)
             
         assert self.gpc_reg_prob is None or (0 <= self.gpc_reg_prob <= 1)
 
 
-    def run_age_loss(self, imgs, c, loss="MSE"):
+    def run_age_loss(self, imgs, c, loss_fn="MSE"):
         """Returns the age loss given a series of generated images and the age the synthetic images
         are suppose to resemble.
 
@@ -94,14 +94,14 @@ class StyleGAN2Loss(Loss):
             tensor: loss
         """
         images = imgs['image']
-        predicted_ages = self.age_model.estimate_age(images.clone())
+        predicted_ages, logits = self.age_model.estimate_age(images.clone())
         predicted_ages = predicted_ages.to(self.device)
         ages = c[:,-1].clone()
-        if loss == "MSE":
+        if loss_fn == "MSE":
             loss = self.age_loss_MSE(predicted_ages, ages) 
-        elif loss =="MAE" or loss=="L1":
+        elif loss_fn =="MAE" or loss_fn=="L1":
             loss = self.age_loss_L1(predicted_ages, ages)
-        elif loss =="CAT":
+        elif loss_fn =="CAT":
             # ages should go from being:
             # [[0,0,1],
             #  [0,1,0],
@@ -109,18 +109,12 @@ class StyleGAN2Loss(Loss):
             # to 
             # [2,1,0,...]
             ages = c[:,25:].clone()
-            _, ages = ages.max(dim=1)
-
-            buckets = torch.tensor(normalize(np.array(self.categories), rmin=0, rmax=100))
-            buckets = buckets.to(self.device)
-
-            pred_ages_cat = torch.bucketize(predicted_ages, buckets, right=True) - 1
-
-            loss = self.cross_entropy_loss(pred_ages_cat, ages)
-
+            # _, ages = ages.max(dim=1)
+            loss = self.cross_entropy_loss(logits, ages)
 
         else:
             raise NotImplementedError
+        
         return loss
 
     def pairwise(self, iterable):
@@ -248,7 +242,7 @@ class StyleGAN2Loss(Loss):
             with torch.autograd.profiler.record_function('Gmain_forward'):
                 gen_img, gen_ws, c_swapped = self.run_G(gen_z, gen_c, swapping_prob=swapping_prob, neural_rendering_resolution=neural_rendering_resolution)
                 gen_logits = self.run_D(gen_img, gen_c, blur_sigma=blur_sigma)
-                age_loss = self.run_age_loss(gen_img, gen_c, loss=age_loss_fn)
+                age_loss = self.run_age_loss(gen_img, gen_c, loss_fn=age_loss_fn)
                 age_loss_scaled = age_loss * age_scale # age scaling
                 if not batch_division:
                     id_loss = self.run_id_loss(gen_img, gen_z, gen_c, c_swapped, neural_rendering_resolution, loss='cosine_similarity', margin=0.2, slope=10)
