@@ -72,8 +72,7 @@ def launch_training(c, desc, outdir, dry_run, resume=None):
     if os.path.isdir(outdir):
         prev_run_parent_dirs = [x for x in os.listdir(outdir) if os.path.isdir(os.path.join(outdir, x))]
 
-    if resume and resume.split('/')[-1] != 'ffhqrebalanced512-64.pkl':
-        # /training-runs/parent_run_name/00003-ffhq-FFHQ_512_6_balanced-gpus2-batch8-gamma5/network-snapshot-0000.pkl
+    if resume and resume.split('/')[-1] not in ['ffhqrebalanced512-64.pkl', 'ffhqrebalanced512-128.pkl']:
         if len(resume.split('/')) >= 3:
             run_parent = resume.split('/')[-3]
             if run_parent in prev_run_parent_dirs:
@@ -128,9 +127,18 @@ def launch_training(c, desc, outdir, dry_run, resume=None):
 
 #----------------------------------------------------------------------------
 
-def init_dataset_kwargs(data):
+def init_dataset_kwargs(data, loss_fn_name):
+    # Added so that the dataset.json files containing the conditioning parameters
+    # will follow the type of age loss function used. 
+    if loss_fn_name == 'MSE':
+        file_name = 'dataset_mse.json'
+    elif loss_fn_name == 'CAT':
+        file_name = 'dataset_cat.json'
+    else:
+        file_name == 'dataset.json'
+    print(f"Loading labels from file: {file_name}...")
     try:
-        dataset_kwargs = dnnlib.EasyDict(class_name='training.dataset.ImageFolderDataset', path=data, use_labels=True, max_size=None, xflip=False)
+        dataset_kwargs = dnnlib.EasyDict(class_name='training.dataset.ImageFolderDataset', path=data, use_labels=True, max_size=None, xflip=False, file_name=file_name)
         dataset_obj = dnnlib.util.construct_class_by_name(**dataset_kwargs) # Subclass of training.dataset.Dataset.
         dataset_kwargs.resolution = dataset_obj.resolution # Be explicit about resolution.
         dataset_kwargs.use_labels = dataset_obj.has_labels # Be explicit about labels.
@@ -226,7 +234,7 @@ def parse_comma_separated_list(s):
 @click.option('--age_version', help='What version of the age estimator to use', type=str, default="v2", required=False)
 @click.option('--age_min', help='Minimum age to generate random ages from', type=int, default=0, required=False)
 @click.option('--age_max', help='Maximum age to generate random ages from', type=int, default=100, required=False)
-@click.option('--categories', help='Age categories', cls=PythonLiteralOption, required=False)
+@click.option('--categories', help='Age categories. ', cls=PythonLiteralOption, required=False, default='[0]')
 
 def main(**kwargs):
     """Train a GAN using the techniques described in the paper
@@ -262,7 +270,7 @@ def main(**kwargs):
     c.data_loader_kwargs = dnnlib.EasyDict(pin_memory=True, prefetch_factor=2)
 
     # Training set.
-    c.training_set_kwargs, dataset_name = init_dataset_kwargs(data=opts.data)
+    c.training_set_kwargs, dataset_name = init_dataset_kwargs(data=opts.data, loss_fn_name=opts.age_loss_fn)
     if opts.cond and not c.training_set_kwargs.use_labels:
         raise click.ClickException('--cond=True requires labels specified in dataset.json')
     c.training_set_kwargs.use_labels = opts.cond

@@ -32,6 +32,7 @@ class Dataset(torch.utils.data.Dataset):
         max_size    = None,     # Artificially limit the size of the dataset. None = no limit. Applied before xflip.
         use_labels  = False,    # Enable conditioning labels? False = label dimension is zero.
         xflip       = False,    # Artificially double the size of the dataset via x-flips. Applied after max_size.
+        file_name   = "dataset.json",
         random_seed = 0,        # Random seed to use when applying max_size.
     ):
         self._name = name
@@ -39,6 +40,7 @@ class Dataset(torch.utils.data.Dataset):
         self._use_labels = use_labels
         self._raw_labels = None
         self._label_shape = None
+        self.file_name = file_name
 
         # Apply max_size.
         self._raw_idx = np.arange(self._raw_shape[0], dtype=np.int64)
@@ -228,7 +230,7 @@ class ImageFolderDataset(Dataset):
         return image
 
     def _load_raw_labels(self):
-        fname = 'dataset.json'
+        fname = self.file_name
         if fname not in self._all_fnames:
             return None
         with self._open_file(fname) as f:
