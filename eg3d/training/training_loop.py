@@ -72,7 +72,7 @@ def setup_snapshot_image_grid(training_set, random_seed=0):
 
 #----------------------------------------------------------------------------
 
-def save_image_grid(img, fname, drange, grid_size, ages=None):
+def save_image_grid(img, fname, drange, grid_size, ages=None, categories = None):
     lo, hi = drange
     img = np.asarray(img, dtype=np.float32)
     img = (img - lo) * (255 / (hi - lo))
@@ -95,8 +95,12 @@ def save_image_grid(img, fname, drange, grid_size, ages=None):
                 counter = 0
                 for r in range(gh):
                     for c in range(gw):
-                        age = denormalize(ages[counter])
-                        text_added.text((c*H,r*W),str(int(age)), font=font) # untested
+                        if categories:
+                            index = ages[counter]
+                            text = f"{categories[index]} - {categories[index+1]}"
+                        else:
+                            text = str(int(denormalize(ages[counter])))
+                        text_added.text((c*H,r*W), text, font=font) # untested
                         counter += 1
             img_grid.save(fname)
     if C == 3:
@@ -107,8 +111,12 @@ def save_image_grid(img, fname, drange, grid_size, ages=None):
                 counter = 0
                 for r in range(gh):
                     for c in range(gw):
-                        age = denormalize(ages[counter])
-                        text_added.text((c*H,r*W),str(int(age)), font=font) # untested
+                        if categories:
+                            index = ages[counter]
+                            text = f"{categories[index]} - {categories[index+1]}"
+                        else:
+                            text = str(int(denormalize(ages[counter])))
+                        text_added.text((c*H,r*W), text, font=font) # untested
                         counter += 1
             img_grid.save(fname)
 
@@ -121,8 +129,8 @@ def denormalize(z, rmin = 0, rmax = 100, tmin = -1, tmax = 1):
 
     Args:
         z (_type_): normalized value
-        rmin (int, optional): Defaults to 5.
-        rmax (int, optional): Defaults to 80.
+        rmin (int, optional): Defaults to 0.
+        rmax (int, optional): Defaults to 100.
         tmin (int, optional): Defaults to -1.
         tmax (int, optional): Defaults to 1.
 
@@ -134,7 +142,7 @@ def denormalize(z, rmin = 0, rmax = 100, tmin = -1, tmax = 1):
 
 #----------------------------------------------------------------------------
 
-def normalize(x, rmin = 5, rmax = 80, tmin = -1, tmax = 1):
+def normalize(x, rmin = 0, rmax = 100, tmin = -1, tmax = 1):
     """Transforms ages ranging from rmin (e.g. 0 years) to rmax (e.g. 100 years) to be between -1 and 1.
 
     Args:
@@ -182,6 +190,7 @@ def get_age_category(age, categories, normalize_category=True, rmin=5, rmax=80):
         categories = np.array(categories)
     age_category = [0] * (len(categories) - 1)
     age_category_index = np.digitize(age, categories, right=False) - 1
+    
     age_category_index = age_category_index[0]
     age_category[age_category_index] = 1
     return age_category
@@ -492,8 +501,12 @@ def training_loop(
             images_depth = -torch.cat([o['image_depth'].cpu() for o in out]).numpy()
             ages = []
             for c in grid_c:
-                ages += (list(c[:,25].cpu().detach().numpy()))
-            save_image_grid(images, os.path.join(run_dir, f'fakes{cur_nimg//1000:06d}.png'), drange=[-1,1], grid_size=grid_size, ages=ages)
+                if categories:
+                    indices = torch.where(c[:, 25:] == 1)[1] # indices of the starting age category
+                    ages += (list(indices.cpu().detach().numpy()))
+                else:
+                    ages += (list(c[:,25].cpu().detach().numpy()))
+            save_image_grid(images, os.path.join(run_dir, f'fakes{cur_nimg//1000:06d}.png'), drange=[-1,1], grid_size=grid_size, ages=ages, categories=categories)
             save_image_grid(images_raw, os.path.join(run_dir, f'fakes{cur_nimg//1000:06d}_raw.png'), drange=[-1,1], grid_size=grid_size, ages=ages)
             save_image_grid(images_depth, os.path.join(run_dir, f'fakes{cur_nimg//1000:06d}_depth.png'), drange=[images_depth.min(), images_depth.max()], grid_size=grid_size, ages=ages)
 
