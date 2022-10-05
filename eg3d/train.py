@@ -71,7 +71,7 @@ def launch_training(c, desc, outdir, dry_run, resume=None):
     prev_run_parent_dirs = []
     if os.path.isdir(outdir):
         prev_run_parent_dirs = [x for x in os.listdir(outdir) if os.path.isdir(os.path.join(outdir, x))]
-
+    
     if resume and resume.split('/')[-1] not in ['ffhqrebalanced512-64.pkl', 'ffhqrebalanced512-128.pkl']:
         if len(resume.split('/')) >= 3:
             run_parent = resume.split('/')[-3]
@@ -300,6 +300,8 @@ def main(**kwargs):
     c.batch_division = opts.batch_division
     c.freeze = opts.freeze
     c.loss_kwargs.age_version = opts.age_version
+    c.loss_kwargs.age_min = opts.age_min
+    c.loss_kwargs.age_max = opts.age_max
     c.age_min = opts.age_min
     c.age_max = opts.age_max
     c.categories = opts.categories
