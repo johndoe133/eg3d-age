@@ -73,9 +73,9 @@ class StyleGAN2Loss(Loss):
         self.age_min = age_min
         self.age_max = age_max
         if age_version == 'v1':
-            self.age_model = AgeEstimator()
+            self.age_model = AgeEstimator(age_min=self.age_min, age_max=self.age_max)
         elif age_version == "v2":
-            self.age_model = AgeEstimatorNew(self.device, categories = self.categories)
+            self.age_model = AgeEstimatorNew(self.device, categories = self.categories, age_min=self.age_min, age_max=self.age_max)
             
         assert self.gpc_reg_prob is None or (0 <= self.gpc_reg_prob <= 1)
 
