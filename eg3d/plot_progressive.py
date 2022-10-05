@@ -16,8 +16,10 @@ import legacy
 from camera_utils import LookAtPoseSampler, FOV_to_intrinsics
 from torch_utils import misc
 from training.triplane import TriPlaneGenerator
-from training.training_loop import denormalize
+from training.training_loop import denormalize, get_age_category
+from train import PythonLiteralOption
 import imageio
+
 
 @click.command()
 @click.option('--network_folder', help='Network folder name', required=True)
@@ -32,7 +34,7 @@ import imageio
 @click.option('--shape-format', help='Shape Format', type=click.Choice(['.mrc', '.ply']), default='.mrc')
 @click.option('--reload_modules', help='Overload persistent modules?', type=bool, required=False, metavar='BOOL', default=False, show_default=True)
 @click.option('--img_h', help='image height', type=int, required=False,default=512, show_default=True)
-
+@click.option('--categories', help='Age categories. ', cls=PythonLiteralOption, required=False)
 def generate_images(
     network_folder: str,
     network: str,
@@ -46,18 +48,21 @@ def generate_images(
     class_idx: Optional[int],
     reload_modules: bool,
     img_h: int,
+    categories: list,
+
 ):
     print(f'Loading networks from "{network_folder}"...')
     device = torch.device('cuda')
     if network is not None:
-        network_pkl = network
+        network_path = network
     else:
         pkls = [string for string in os.listdir(network_folder) if '.pkl' in string]
         pkls = sorted(pkls)
         network_pkl = pkls[-1]
+        network_path = os.path.join(network_folder, network_pkl)
     
-    print("Loading network named:", network_pkl)
-    network_pkl = os.path.join(network_folder, network_pkl)
+    print("Loading network from path:", network_path)
+    network_pkl = network_path
 
     outdir = network_folder
     with dnnlib.util.open_url(network_pkl) as f:
@@ -76,8 +81,11 @@ def generate_images(
     imgs = []
 
     angle_p = 0
-    ages = [5,10,20,30,40,50,60,70]
-    ages = [normalize(age) for age in ages]
+    ages = [0,5,10,15,20,30,45,60,80]
+    if categories:
+        age=categories
+    # ages = [normalize(age) for age in ages]
+
 
     for angle_y, angle_p in [(.4, angle_p), (0, angle_p), (-.4, angle_p)]:
         cam_pivot = torch.tensor(G.rendering_kwargs.get('avg_camera_pivot', [0,0,0]), device=device)
@@ -85,11 +93,15 @@ def generate_images(
         cam2world_pose = LookAtPoseSampler.sample(np.pi/2 + angle_y, np.pi/2 + angle_p, cam_pivot, radius=cam_radius, device=device)
         conditioning_cam2world_pose = LookAtPoseSampler.sample(np.pi/2, np.pi/2, cam_pivot, radius=cam_radius, device=device)
         camera_params = torch.cat([cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)
-        conditioning_params = torch.cat([conditioning_cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)
+        conditioning_params = torch.cat([conditioning_cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)    
 
         for age in ages:
-            c = torch.cat((conditioning_params, torch.tensor([[age]], device=device)), 1)
-            c_params = torch.cat((camera_params, torch.tensor([[age]], device=device)), 1)
+            if categories:
+                age_list = get_age_category(np.array([age]), categories, normalize_category=False)
+            else:
+                age_list = [normalize(age)]
+            c = torch.cat((conditioning_params, torch.tensor([age_list], device=device)), 1)
+            c_params = torch.cat((camera_params, torch.tensor([age_list], device=device)), 1)
             ws = G.mapping(z, c, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff)
             img = G.synthesis(ws, c_params)['image']
 
@@ -108,38 +120,46 @@ def generate_images(
     print(f'saved at {outdir}/seed{seed:04d}.png')
 
     ######## GIF #########
-    print("Creating .gif file...")
-    ages = np.linspace(-1,1,75) #one for each age
-    imgs_gif = []
-    font = ImageFont.truetype("FreeSerif.ttf", 40)
-    
-    angle_y, angle_p = (0, 0)
-    cam_pivot = torch.tensor(G.rendering_kwargs.get('avg_camera_pivot', [0, 0, 0]), device=device)
-    cam_radius = G.rendering_kwargs.get('avg_camera_radius', 2.7)
-    cam2world_pose = LookAtPoseSampler.sample(np.pi/2 + angle_y, np.pi/2 + angle_p, cam_pivot, radius=cam_radius, device=device)
-    conditioning_cam2world_pose = LookAtPoseSampler.sample(np.pi/2, np.pi/2, cam_pivot, radius=cam_radius, device=device)
-    camera_params = torch.cat([cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)
-    conditioning_params = torch.cat([conditioning_cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)
+    if not categories:
 
-    for age in ages:
-        cuda0 = torch.device('cuda:0')
-        c = torch.cat((conditioning_params, torch.tensor([[age]], device=cuda0)), 1)
-        c_params = torch.cat((camera_params, torch.tensor([[age]], device=cuda0)), 1)
-        c_params = c_params.float()
-        ws = G.mapping(z, c, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff)
-        img = G.synthesis(ws, c_params)['image']
+        print("Creating .gif file...")
+        ages = np.linspace(-1,1,75) #one for each age
+        imgs_gif = []
+        font = ImageFont.truetype("FreeSerif.ttf", 40)
+        
+        angle_y, angle_p = (0, 0)
+        cam_pivot = torch.tensor(G.rendering_kwargs.get('avg_camera_pivot', [0, 0, 0]), device=device)
+        cam_radius = G.rendering_kwargs.get('avg_camera_radius', 2.7)
+        cam2world_pose = LookAtPoseSampler.sample(np.pi/2 + angle_y, np.pi/2 + angle_p, cam_pivot, radius=cam_radius, device=device)
+        conditioning_cam2world_pose = LookAtPoseSampler.sample(np.pi/2, np.pi/2, cam_pivot, radius=cam_radius, device=device)
+        camera_params = torch.cat([cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)
+        conditioning_params = torch.cat([conditioning_cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)
 
-        img = (img.permute(0, 2, 3, 1) * 127.5 + 128).clamp(0, 255).to(torch.uint8)
-        pil_img = PIL.Image.fromarray(img[0,:,:,:].cpu().numpy().astype('uint8')) # to draw on
-        text_added = ImageDraw.Draw(pil_img)
-        text_color="#A0240A"
-        text_added.text((0,450), f"Age: {int(denormalize(age))}", font=font, fill=text_color)
-        imgs_gif.append(np.array(pil_img))
+        for age in ages:
+            if categories:
+                age_list = get_age_category(np.array([age]), categories, normalize_category=False)
+            else:
+                age_list = [normalize(age)]
+            cuda0 = torch.device('cuda:0')
+            c = torch.cat((conditioning_params, torch.tensor([age_list], device=cuda0)), 1)
+            c_params = torch.cat((camera_params, torch.tensor([age_list], device=cuda0)), 1)
+            c_params = c_params.float()
+            ws = G.mapping(z, c, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff)
+            img = G.synthesis(ws, c_params)['image']
 
-    # imgs_gif = [tensor.cpu().numpy()[0,:,:,:] for tensor in imgs_gif]
-    print("Saving gif..")
-    imageio.mimsave(f'{network_folder}/seed{seed:04d}.gif', imgs_gif)
-    print("Exiting..")
+            img = (img.permute(0, 2, 3, 1) * 127.5 + 128).clamp(0, 255).to(torch.uint8)
+            pil_img = PIL.Image.fromarray(img[0,:,:,:].cpu().numpy().astype('uint8')) # to draw on
+            text_added = ImageDraw.Draw(pil_img)
+            text_color="#A0240A"
+            text_added.text((0,450), f"Age: {age}", font=font, fill=text_color)
+            imgs_gif.append(np.array(pil_img))
+
+        # imgs_gif = [tensor.cpu().numpy()[0,:,:,:] for tensor in imgs_gif]
+        print("Saving gif..")
+        imageio.mimsave(f'{network_folder}/seed{seed:04d}.gif', imgs_gif)
+        print("Exiting..")
+    else:
+        print("Not saving gif as it's only for scalar age condition.")
 
 if __name__ == "__main__":
     generate_images() # pylint: disable=no-value-for-parameter
