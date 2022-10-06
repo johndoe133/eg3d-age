@@ -20,7 +20,7 @@ class AgeEstimatorNew():
     """Takes the device and a list of age categories as input. If age categories
     are not used then the input should be `[0]`. 
     """
-    def __init__(self, device, categories = [0]):
+    def __init__(self, device, categories = [0], age_min=0, age_max=100):
         root = os.path.expanduser('~')
         model = get_model(model_name=cfg.MODEL.ARCH, pretrained=None)
         self.age_model = model.to(device)
@@ -35,6 +35,8 @@ class AgeEstimatorNew():
         self.img_size = 224
         self.ages = torch.arange(0,101, device = self.device)
         self.categories = categories
+        self.age_min = age_min
+        self.age_max = age_max
     
     def estimate_age(self, gen_img, normalize = True, crop=False):
         """Takes output of G.synthesis and estimates the age of the synthetic person.
@@ -70,7 +72,7 @@ class AgeEstimatorNew():
             logits = self.categorize_logits(logits)
 
         if normalize:
-            return self.normalize_ages(predicted_ages), logits
+            return self.normalize_ages(predicted_ages, rmin=self.age_min, rmax=self.age_max), logits
         else:
             return predicted_ages, logits
 
@@ -176,7 +178,7 @@ class AgeEstimatorNew():
         return torch.round(z, decimals=4)
 
 class AgeEstimator():
-    def __init__(self):
+    def __init__(self, age_min=0, age_max=100):
         root = os.path.expanduser('~')
         self.age_model_path = os.path.join(root, "Documents/eg3d-age/eg3d/networks/dex", 'pth/age_sd.pth')
         self.age_model = Age()
@@ -184,6 +186,8 @@ class AgeEstimator():
         self.age_model.requires_grad_(requires_grad=False) # weights are freezed 
         self.age_model.eval()
         self.n = torch.arange(0,101)
+        self.age_min = age_min
+        self.age_max = age_max
 
     def estimate_age(self, gen_img):
         """Takes output of G.synthesis and estimates the age of the synthetic person
@@ -199,7 +203,7 @@ class AgeEstimator():
         img = torch.floor(img) # round of pixels
         img = img.type('torch.FloatTensor') # input type of age model
         age_predictions = self.predict_ages(img)
-        age_predictions = self.normalize_ages(age_predictions)
+        age_predictions = self.normalize_ages(age_predictions, rmin=self.age_min, rmax=self.age_max)
         return age_predictions
 
     def normalize_ages(self, age, rmin = 5, rmax = 80, tmin = -1, tmax = 1):
