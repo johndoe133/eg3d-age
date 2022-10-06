@@ -146,7 +146,7 @@ class StyleGAN2Loss(Loss):
             for age in ages:
                 new_age = random.uniform(-1,1)
                 while np.abs(age.item() - new_age) < margin:
-                    new_age = random.uniform(normalize(self.age_min), normalize(self.age_max))
+                    new_age = random.uniform(-1, 1)
                 random_ages.append(new_age)
 
             new_c_swapped = c_swapped.clone() # used for the G.mapping step so the "scene identity" is preserved
@@ -168,8 +168,8 @@ class StyleGAN2Loss(Loss):
             p = 1/(number_of_age_ranges - 1) # probability of choosing another category
             probabilities = torch.full_like(ages, p).to(self.device)
             probabilities[ages.bool()] = 0 # uniform probability of choosing another category except for the one it was before
-            probabilities[j,:left]=0
-            probabilities[j,right:]=0
+            probabilities[j,:left]=0 # dont pick ranges less than age_min
+            probabilities[j,right:]=0 # dont pick ranges bigger than age_max
             idx = probabilities.multinomial(1, False).flatten().to(self.device) # choosing the index of the new category
             new_categories = torch.zeros_like(ages).to(self.device)
             new_categories[j, idx] = 1
