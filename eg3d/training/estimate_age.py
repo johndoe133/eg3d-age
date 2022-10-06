@@ -52,7 +52,7 @@ class AgeEstimatorNew():
         Returns:
             tensor, tensor: predicted ages, logits
         """
-        img_RGB = (gen_img * 127.5 + 128).clamp(0, 255) # rescale image to be between 0 and 255
+        img_RGB = (gen_img * 127.5 + 128).clamp(0, 255) # rescale image values to be between 0 and 255
         if crop:
             img_RGB_detached = img_RGB.detach() 
             detections = self.detect_faces(img_RGB_detached)
