@@ -34,7 +34,7 @@ import imageio
 @click.option('--shape-format', help='Shape Format', type=click.Choice(['.mrc', '.ply']), default='.mrc')
 @click.option('--reload_modules', help='Overload persistent modules?', type=bool, required=False, metavar='BOOL', default=False, show_default=True)
 @click.option('--img_h', help='image height', type=int, required=False,default=512, show_default=True)
-@click.option('--categories', help='Age categories. ', cls=PythonLiteralOption, required=False)
+@click.option('--categories', help='Age categories. ', cls=PythonLiteralOption, required=False, default='[]')
 def generate_images(
     network_folder: str,
     network: str,
@@ -48,7 +48,7 @@ def generate_images(
     class_idx: Optional[int],
     reload_modules: bool,
     img_h: int,
-    categories: list,
+    categories: Optional[list],
 
 ):
     print(f'Loading networks from "{network_folder}"...')
@@ -82,8 +82,8 @@ def generate_images(
 
     angle_p = 0
     ages = [0,5,10,15,20,30,45,60,80]
-    if categories:
-        age=categories
+    if categories != []:
+        ages=categories
     # ages = [normalize(age) for age in ages]
 
 
@@ -117,7 +117,7 @@ def generate_images(
         img_stack.append(img[0][:, i*img_h*no_ages: (i+1)*img_h*no_ages,:])
     t = torch.cat(img_stack)
     PIL.Image.fromarray(t.cpu().numpy(), 'RGB').save(f'{network_folder}/seed{seed:04d}.png')
-    print(f'saved at {outdir}/seed{seed:04d}.png')
+    print(f'Saved at {outdir}/seed{seed:04d}.png')
 
     ######## GIF #########
     if not categories:
@@ -136,10 +136,7 @@ def generate_images(
         conditioning_params = torch.cat([conditioning_cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)
 
         for age in ages:
-            if categories:
-                age_list = get_age_category(np.array([age]), categories, normalize_category=False)
-            else:
-                age_list = [normalize(age)]
+            age_list = [age]
             cuda0 = torch.device('cuda:0')
             c = torch.cat((conditioning_params, torch.tensor([age_list], device=cuda0)), 1)
             c_params = torch.cat((camera_params, torch.tensor([age_list], device=cuda0)), 1)
@@ -151,7 +148,7 @@ def generate_images(
             pil_img = PIL.Image.fromarray(img[0,:,:,:].cpu().numpy().astype('uint8')) # to draw on
             text_added = ImageDraw.Draw(pil_img)
             text_color="#A0240A"
-            text_added.text((0,450), f"Age: {age}", font=font, fill=text_color)
+            text_added.text((0,450), f"Age: {int(denormalize(age))}", font=font, fill=text_color)
             imgs_gif.append(np.array(pil_img))
 
         # imgs_gif = [tensor.cpu().numpy()[0,:,:,:] for tensor in imgs_gif]
