@@ -100,7 +100,7 @@ def save_image_grid(img, fname, drange, grid_size, ages=None, categories = None,
                             text = f"{categories[index]} - {categories[index+1]}"
                         else:
                             text = str(int(denormalize(ages[counter], rmin=age_min, rmax=age_max)))
-                        text_added.text((c*H,r*W), text, font=font) # untested
+                        text_added.text((c*H,r*W), text, font=font) 
                         counter += 1
             img_grid.save(fname)
     if C == 3:
@@ -116,7 +116,7 @@ def save_image_grid(img, fname, drange, grid_size, ages=None, categories = None,
                             text = f"{categories[index]} - {categories[index+1]}"
                         else:
                             text = str(int(denormalize(ages[counter], rmin=age_min, rmax=age_max)))
-                        text_added.text((c*H,r*W), text, font=font) # untested
+                        text_added.text((c*H,r*W), text, font=font) 
                         counter += 1
             img_grid.save(fname)
 
@@ -124,8 +124,8 @@ def save_image_grid(img, fname, drange, grid_size, ages=None, categories = None,
 
 def denormalize(z, rmin = 0, rmax = 100, tmin = -1, tmax = 1):
     """To go from the normalized ages ranged from -1 to 1 to actual ages.
-    The normalization of the ages are based on a range age from 5 to 80 years 
-    and so the denormalization is the same. 
+    The normalization of the ages are based on a range age from rmin to rmax years.
+    Denormalizing only works if rmin and rmax was the same for both normlize() and denormalize().
 
     Args:
         z (_type_): normalized value
@@ -501,7 +501,7 @@ def training_loop(
             images_depth = -torch.cat([o['image_depth'].cpu() for o in out]).numpy()
             ages = []
             for c in grid_c:
-                if categories:
+                if categories != [0]:
                     indices = torch.where(c[:, 25:] == 1)[1] # indices of the starting age category
                     ages += (list(indices.cpu().detach().numpy()))
                 else:
