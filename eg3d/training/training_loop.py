@@ -95,7 +95,7 @@ def save_image_grid(img, fname, drange, grid_size, ages=None, categories = None,
                 counter = 0
                 for r in range(gh):
                     for c in range(gw):
-                        if categories:
+                        if len(categories) > 1:
                             index = ages[counter]
                             text = f"{categories[index]} - {categories[index+1]}"
                         else:
@@ -111,8 +111,8 @@ def save_image_grid(img, fname, drange, grid_size, ages=None, categories = None,
                 counter = 0
                 for r in range(gh):
                     for c in range(gw):
-                        if categories:
-                            index = ages[counter]
+                        if len(categories) > 1:
+                            index = int(ages[counter])
                             text = f"{categories[index]} - {categories[index+1]}"
                         else:
                             text = str(int(denormalize(ages[counter], rmin=age_min, rmax=age_max)))

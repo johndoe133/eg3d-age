@@ -70,7 +70,7 @@ def generate_images(
     
     z = torch.from_numpy(np.random.RandomState(seed).randn(1, G.z_dim)).to(device)
 
-    def normalize(x, rmin = 5, rmax = 80, tmin = -1, tmax = 1):
+    def normalize(x, rmin = 20, rmax = 100, tmin = -1, tmax = 1):
         # normalize age between -1 and 1
         z = ((x - rmin) / (rmax - rmin)) * (tmax - tmin) + tmin
         return z
@@ -81,7 +81,7 @@ def generate_images(
     imgs = []
 
     angle_p = 0
-    ages = [0,5,10,15,20,30,45,60,80]
+    ages = [20,30,40,50,60,70,80,90,100]
     if categories != []:
         ages=categories
     # ages = [normalize(age) for age in ages]
@@ -96,7 +96,7 @@ def generate_images(
         conditioning_params = torch.cat([conditioning_cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)    
 
         for age in ages:
-            if categories:
+            if len(categories) > 1:
                 age_list = get_age_category(np.array([age]), categories, normalize_category=False)
             else:
                 age_list = [normalize(age)]
