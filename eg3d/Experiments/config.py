@@ -16,7 +16,7 @@ template_text = """
 #BSUB -gpu "num={gpu_num}:mode=shared:j_exclusive=yes"
 
 ### -- set walltime limit: hh:mm --  maximum 24 hours for GPU-queues right now
-#BSUB -W 24:00
+#BSUB -W 72:00
 
 # Request GPU resources
 #BSUB -R "rusage[mem={gpu_mem}GB]"
