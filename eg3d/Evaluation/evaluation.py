@@ -16,6 +16,7 @@ from scipy.stats import gaussian_kde
 from training.coral import Coral
 from plot_training_results import plot_setup, compute_figsize
 
+
 @click.command()
 @click.option('--network_folder', help='Network folder name', required=True)
 @click.option('--network', help='Network folder name', default=None, required=False)
@@ -26,6 +27,7 @@ from plot_training_results import plot_setup, compute_figsize
 @click.option('--run_eval', help='Whether to run evaluation loop', default=True, type=bool)
 @click.option('--no-img', help='Number of random seeds to generate synthetic images from', default=10, type=int)
 @click.option('--model_name', help='Age model used', default="coral", type=str)
+
 
 def evaluate(
     network_folder: str,
@@ -58,12 +60,13 @@ def evaluate(
         run_age_evaluation(model_name, ages, angles_p, angles_y, network_folder, network_pkl, seed, device, truncation_cutoff, truncation_psi, seeds)
         run_id_evaluation(ages_id, network_folder, network_pkl, seed, device, truncation_cutoff, truncation_psi, seeds)
     
-    save_dir = os.path.join("Evaluations", network_folder.split("/")[-1])
+    save_dir = os.path.join("Evaluation", "Runs", network_folder.split("/")[-1])
     save_path_age = os.path.join(save_dir, "age_evaluation.csv")
     save_path_id = os.path.join(save_dir, "id_evaluation.csv")
 
     if create_graph:
         generate_age_plot(save_path_age, save_dir, ages, angles_p, angles_y)
+        generate_scatter_age_plot(save_path_age, save_dir, ages)
         generate_id_plot(save_path_id ,save_dir, ages_id)
 
 
@@ -226,7 +229,6 @@ def generate_age_plot(save_path,save_dir, ages, angles_p, angles_y):
     plt.savefig(save_dir + f"/{fig_name}")
     print(f"Figure {fig_name} save at {save_dir}")
     
-
 def generate_id_plot(save_path_id ,save_dir, ages_id):
     plot_setup()
     figsize = compute_figsize(426, 500)
@@ -281,6 +283,11 @@ def generate_id_plot(save_path_id ,save_dir, ages_id):
     plt.savefig(save_dir + f"/{fig_name}")
     print(f"Figure {fig_name} save at {save_dir}")     
 
+def generate_scatter_age_plot(save_path, save_dir, ages):
+    plot_setup()
+    df = pd.read_csv(save_path)
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    figsize = compute_figsize(426, 500)
 
 def run_age_evaluation(
     model_name, ages, angles_p, angles_y, network_folder, network_pkl, seed, 
@@ -328,7 +335,7 @@ def run_age_evaluation(
     df = pd.DataFrame(res, columns=columns)
 
     # Save as csv file
-    save_dir = os.path.join("Evaluations", network_folder.split("/")[-1])
+    save_dir = os.path.join("Evaluation", "Runs", network_folder.split("/")[-1])
     os.makedirs(save_dir, exist_ok=True)
     save_path = os.path.join(save_dir, "age_evaluation.csv")
     print("Saving csv at", save_dir,"...")
@@ -372,7 +379,7 @@ def run_id_evaluation(
     df = pd.DataFrame(res, columns=columns)
 
     # Save as csv file
-    save_dir = os.path.join("Evaluations", network_folder.split("/")[-1])
+    save_dir = os.path.join("Evaluation", "Runs", network_folder.split("/")[-1])
     os.makedirs(save_dir, exist_ok=True)
     save_path = os.path.join(save_dir, "id_evaluation.csv")
     print("Saving csv at", save_dir,"...")
