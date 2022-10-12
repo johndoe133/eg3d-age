@@ -30,6 +30,7 @@ import legacy
 from metrics import metric_main
 from camera_utils import LookAtPoseSampler
 from training.crosssection_utils import sample_cross_section
+import git
 #----------------------------------------------------------------------------
 
 def setup_snapshot_image_grid(training_set, random_seed=0):
@@ -274,7 +275,16 @@ def training_loop(
     D = dnnlib.util.construct_class_by_name(**D_kwargs, **common_kwargs).train().requires_grad_(False).to(device) # subclass of torch.nn.Module
     G_ema = copy.deepcopy(G).eval()
     
+    
+
+    # Print current git repo
+    repo = git.Repo(search_parent_directories=True)
+    sha = repo.head.object.hexsha
+
+    print('Running on commit {sha}')
+
     # Resume from existing pickle.
+
     if (resume_pkl is not None) and (rank == 0):
         print(f'Resuming from "{resume_pkl}"')
         with dnnlib.util.open_url(resume_pkl) as f:
