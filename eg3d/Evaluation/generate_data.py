@@ -47,6 +47,7 @@ def generate_data(
     ages_id: list,
     angles_p: list,
     angles_y: list,
+    scatter_iterations: int,
 
     ):
     ## LOADING NETWORK ##
@@ -64,11 +65,11 @@ def generate_data(
 
     generate_age_data(G, age_model_name, device, ages, angles_p, angles_y, seeds, save_name, truncation_cutoff, truncation_psi)
     generate_id_data(G, device, ages_id, seeds, save_name, truncation_cutoff, truncation_psi)
-    generate_scatter_data(G, device, seed, save_name, truncation_cutoff, truncation_psi, age_model_name)
+    generate_scatter_data(G, device, seed, save_name, truncation_cutoff, truncation_psi, age_model_name, scatter_iterations)
     generate_image(G, seed, device, network_folder, save_name)
     del G
 
-def generate_scatter_data(G, device, seed, save_name, truncation_cutoff, truncation_psi, age_model_name):
+def generate_scatter_data(G, device, seed, save_name, truncation_cutoff, truncation_psi, age_model_name, iterations):
     ## Age evaluation
     if age_model_name == 'coral':
         age_model = Coral()
@@ -78,8 +79,8 @@ def generate_scatter_data(G, device, seed, save_name, truncation_cutoff, truncat
         age_model = AgeEstimatorNew(device)
 
     iterations = 100
-    angles_p = np.random.RandomState(seed).uniform(-0.5,0.5, size=(iterations))
-    angles_y = np.random.RandomState(seed+1).uniform(-0.5,0.5, size=(iterations))
+    angles_p = np.random.RandomState(seed).uniform(-0.5, 0.5, size=(iterations))
+    angles_y = np.random.RandomState(seed+1).uniform(-0.5, 0.5, size=(iterations))
     ages = np.random.RandomState(seed+2).uniform(-1, 1, size=(iterations))
     z = torch.from_numpy(np.random.RandomState(seed).randn(iterations, G.z_dim)).to(device)
     fov_deg = 18.837
