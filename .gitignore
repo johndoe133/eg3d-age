@@ -49,3 +49,4 @@ eg3d/PTI/embeddings/w
 eg3d/PTI/image_original/*.png
 eg3d/PTI/image_original/*.jpg
 eg3d/PTI/image_original/
+eg3d/Evaluation/Runs/*

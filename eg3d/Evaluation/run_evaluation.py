@@ -36,6 +36,7 @@ from Evaluation.Plots.scatter import scatter_plot
 @click.option('--angles_p', help='', cls=PythonLiteralOption, required=False, default="[0.3, 0, -0.3]")
 @click.option('--angles_y', help='', cls=PythonLiteralOption, required=False, default="[0.4, 0, -0.4]")
 @click.option('--run_generate_data', help='',required=False, default=True)
+@click.option('--scatter_iterations', help='Number of generated random synthetic faces for scatter plot',required=False, default=100)
 def run_evaluation(
     network_folder: str,
     network: str,
@@ -49,6 +50,8 @@ def run_evaluation(
     angles_p: list,
     angles_y: list,
     run_generate_data: bool,
+    scatter_iterations: int,
+
     ):
     np.seterr(all="ignore") # ignore numpy warnings
 
@@ -62,9 +65,9 @@ def run_evaluation(
     save_name = f"{network_pkl_path.split('/')[2]}-{network_pkl.split('.')[0][8:]}"
 
     if run_generate_data:
-        generate_data(save_name, network_folder, network_pkl_path, network_pkl, seed,truncation_psi, truncation_cutoff, no_img,age_model_name, ages, ages_id, angles_p, angles_y)
+        generate_data(save_name, network_folder, network_pkl_path, network_pkl, seed,truncation_psi, truncation_cutoff, no_img,age_model_name, ages, ages_id, angles_p, angles_y, scatter_iterations)
     
-    scatter_plot(network_folder, save_name)
+    scatter_plot(network_folder, save_name, scatter_iterations)
 
     angles_plot(save_name, angles_p, angles_y)
 
