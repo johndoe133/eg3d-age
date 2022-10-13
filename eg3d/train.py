@@ -235,6 +235,7 @@ def parse_comma_separated_list(s):
 @click.option('--age_min', help='Minimum age to generate random ages from', type=int, default=0, required=False)
 @click.option('--age_max', help='Maximum age to generate random ages from', type=int, default=100, required=False)
 @click.option('--categories', help='Age categories. ', cls=PythonLiteralOption, required=False, default='[0]')
+@click.option('--id_model', help='What ID model to use. Choose between ArcFace and MagFace. ', type=str, required=False, default='ArcFace')
 
 def main(**kwargs):
     """Train a GAN using the techniques described in the paper
@@ -300,6 +301,7 @@ def main(**kwargs):
     c.batch_division = opts.batch_division
     c.freeze = opts.freeze
     c.loss_kwargs.age_version = opts.age_version
+    c.loss_kwargs.id_model = opts.id_model
     c.loss_kwargs.age_min = opts.age_min
     c.loss_kwargs.age_max = opts.age_max
     c.age_min = opts.age_min
