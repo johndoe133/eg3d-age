@@ -202,9 +202,9 @@ class AgeEstimator():
         img = self.resize(img) # resize to fit model
         img = torch.floor(img) # round of pixels
         img = img.type('torch.FloatTensor') # input type of age model
-        age_predictions = self.predict_ages(img)
+        age_predictions, logits = self.predict_ages(img)
         age_predictions = self.normalize_ages(age_predictions, rmin=self.age_min, rmax=self.age_max)
-        return age_predictions
+        return age_predictions, logits
 
     def normalize_ages(self, age, rmin = 5, rmax = 80, tmin = -1, tmax = 1):
         z = ((age - rmin) / (rmax - rmin)) * (tmax - tmin) + tmin
@@ -218,7 +218,7 @@ class AgeEstimator():
     def predict_ages(self, images):
         P_predictions = self.age_model(images)
         ages = torch.sum(P_predictions * self.n, axis=1)
-        return ages
+        return ages, P_predictions
 
     def resize(self, img):
         """Resize image tensor to fit age model
