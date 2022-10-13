@@ -37,7 +37,8 @@ class StyleGAN2Loss(Loss):
                     blur_init_sigma=0, blur_fade_kimg=0, r1_gamma_init=0, r1_gamma_fade_kimg=0, 
                     neural_rendering_resolution_initial=64, neural_rendering_resolution_final=None, 
                     neural_rendering_resolution_fade_kimg=0, gpc_reg_fade_kimg=1000, gpc_reg_prob=None, 
-                    dual_discrimination=False, filter_mode='antialiased', age_version='v2', categories=[0], age_min=0, age_max=100):
+                    dual_discrimination=False, filter_mode='antialiased', age_version='v2', categories=[0], 
+                    age_min=0, age_max=100, id_model="ArcFace"):
         super().__init__()
         self.device             = device
         self.G                  = G
@@ -67,7 +68,7 @@ class StyleGAN2Loss(Loss):
         self.age_loss_L1 = torch.nn.L1Loss()
         self.cross_entropy_loss = torch.nn.CrossEntropyLoss()
         self.cosine_sim = torch.nn.CosineSimilarity()
-        self.id_model = FaceIDLoss(device)
+        self.id_model = FaceIDLoss(device, model = id_model)
         self.age_version = age_version
         self.categories = categories
         self.age_min = age_min

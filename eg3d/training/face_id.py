@@ -65,10 +65,12 @@ class FaceIDLoss:
             tensor: resized tensor
         """
         return F.interpolate(img, [self.resize_shape, self.resize_shape],  mode='bilinear', align_corners=True)    
+    
+    def __repr__(self) -> str:
+        return f"{self.id_model} \n\n ID_model using {self.model}"
 
-    def get_loss(self, latent_chords, new_latent_chords):
-        pass
-
+    def __str__(self) -> str:
+        return f"{self.id_model} \n\n ID_model using {self.model}"
 
 # MIT License
 
