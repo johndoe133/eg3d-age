@@ -50,3 +50,4 @@ eg3d/PTI/image_original/*.png
 eg3d/PTI/image_original/*.jpg
 eg3d/PTI/image_original/
 eg3d/Evaluation/Runs/*
+eg3d/networks/*.pt
