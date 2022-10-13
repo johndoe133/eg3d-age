@@ -20,6 +20,7 @@ from training.coral import Coral
 from plot_training_results import plot_setup, compute_figsize
 from train import PythonLiteralOption
 from torchvision.utils import make_grid
+from training.training_loop import get_age_category
 
 def image_grid(imgs, rows, cols):
     #https://stackoverflow.com/questions/37921295/python-pil-image-make-3x3-grid-from-sequence-images
@@ -65,11 +66,11 @@ def generate_data(
 
     generate_age_data(G, age_model_name, device, ages, angles_p, angles_y, seeds, save_name, truncation_cutoff, truncation_psi)
     generate_id_data(G, device, ages_id, seeds, save_name, truncation_cutoff, truncation_psi)
-    generate_scatter_data(G, device, seed, save_name, truncation_cutoff, truncation_psi, age_model_name, scatter_iterations)
+    generate_scatter_data(G, device, seed, save_name, network_folder, truncation_cutoff, truncation_psi, age_model_name, scatter_iterations)
     generate_image(G, seed, device, network_folder, save_name)
     del G
 
-def generate_scatter_data(G, device, seed, save_name, truncation_cutoff, truncation_psi, age_model_name, iterations):
+def generate_scatter_data(G, device, seed, save_name, network_folder, truncation_cutoff, truncation_psi, age_model_name, iterations):
     ## Age evaluation
     if age_model_name == 'coral':
         age_model = Coral()
@@ -78,13 +79,28 @@ def generate_scatter_data(G, device, seed, save_name, truncation_cutoff, truncat
     elif age_model_name == 'v2':
         age_model = AgeEstimatorNew(device)
 
-    iterations = 100
+
+    training_option_path = os.path.join(network_folder, "training_options.json")
+    f = open(training_option_path)
+    training_option = json.load(f)
+    if 'categories' in training_option.keys():
+        categories = training_option['categories']
+    else: # if evaluating an old version without categories
+        categories = [0]
+    
     angles_p = np.random.RandomState(seed).uniform(-0.5, 0.5, size=(iterations))
     angles_y = np.random.RandomState(seed+1).uniform(-0.5, 0.5, size=(iterations))
-    ages = np.random.RandomState(seed+2).uniform(-1, 1, size=(iterations))
     z = torch.from_numpy(np.random.RandomState(seed).randn(iterations, G.z_dim)).to(device)
-    fov_deg = 18.837
 
+    if len(categories) > 1:
+        ranges = len(categories)-1
+        ages = np.zeros((iterations, ranges))
+        for i in range(iterations):
+            ages[i, (i % ranges)] = 1
+    else:
+        ages = np.random.RandomState(seed+2).uniform(-1, 1, size=(iterations, 1))
+
+    fov_deg = 18.837
     intrinsics = FOV_to_intrinsics(fov_deg, device=device)
     cam_pivot = torch.tensor(G.rendering_kwargs.get('avg_camera_pivot', [0,0,0]), device=device)
     cam_radius = G.rendering_kwargs.get('avg_camera_radius', 2.7)
@@ -94,14 +110,14 @@ def generate_scatter_data(G, device, seed, save_name, truncation_cutoff, truncat
         conditioning_cam2world_pose = LookAtPoseSampler.sample(np.pi/2, np.pi/2, cam_pivot, radius=cam_radius, device=device)
         camera_params = torch.cat([cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)
         conditioning_params = torch.cat([conditioning_cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)    
-        c = torch.cat((conditioning_params, torch.tensor([[age]], device=device)), 1)
-        c_params = torch.cat((camera_params, torch.tensor([[age]], device=device)), 1).float()
+        c = torch.cat((conditioning_params, torch.tensor([age], device=device)), 1)
+        c_params = torch.cat((camera_params, torch.tensor([age], device=device)), 1).float()
 
         ws = G.mapping(zi[None,:], c, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff)
         img = G.synthesis(ws, c_params)['image']
         age_hat, logits = age_model.estimate_age(img)
         res.append([age_hat.item(), age, angle_p, angle_y])
-    
+
     columns = ["age_hat", "age_true", "angle_p", "angle_y"]
     df = pd.DataFrame(res, columns=columns)
     # Save as csv file
@@ -220,15 +236,16 @@ def generate_image(G, seed, device, path, save_name):
             for i in range(images_per_angle): #generate two images per angle
                 z = torch.from_numpy(np.random.randn(1, G.z_dim)).to(device)
                 if len(categories) > 1:
-                    pass
+                    age = normalize(np.random.randint(age_min, age_max + 1, size=1), rmin=age_min, rmax=age_max)
+                    age = get_age_category(age, categories, normalize_category=True)
                 else:
-                    age = normalize(np.random.randint(age_min, age_max + 1), rmin=age_min, rmax=age_max)
+                    age = [normalize(np.random.randint(age_min, age_max + 1), rmin=age_min, rmax=age_max)]
                 cam2world_pose = LookAtPoseSampler.sample(np.pi/2 + angle_y, np.pi/2 + angle_p, cam_pivot, radius=cam_radius, device=device)
                 conditioning_cam2world_pose = LookAtPoseSampler.sample(np.pi/2, np.pi/2, cam_pivot, radius=cam_radius, device=device)
                 camera_params = torch.cat([cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)
                 conditioning_params = torch.cat([conditioning_cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)    
-                c = torch.cat((conditioning_params, torch.tensor([[age]], device=device)), 1)
-                c_params = torch.cat((camera_params, torch.tensor([[age]], device=device)), 1).float()
+                c = torch.cat((conditioning_params, torch.tensor([age], device=device)), 1)
+                c_params = torch.cat((camera_params, torch.tensor([age], device=device)), 1).float()
 
                 ws = G.mapping(z, c, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff)
                 img = G.synthesis(ws, c_params)['image']
@@ -237,7 +254,12 @@ def generate_image(G, seed, device, path, save_name):
                 pil_img = Image.fromarray(img.permute(0,2,3,1)[0].cpu().numpy(), 'RGB')
                 text_added = ImageDraw.Draw(pil_img)
                 
-                text_added.text((0,420), f"Age: {int(denormalize(age, rmin=age_min, rmax=age_max))}", font=font, fill=text_color)
+                if len(categories) > 1:
+                    age_index = np.array(age).nonzero()[0][0]
+                    image_text = f"Age: {categories[age_index]} - {categories[age_index + 1]}"
+                    text_added.text((0,420), image_text, font=font, fill=text_color)
+                else:
+                    text_added.text((0,420), f"Age: {int(denormalize(age, rmin=age_min, rmax=age_max))}", font=font, fill=text_color)
                 images.append(pil_img)
                 
                 # images.append(img[0])

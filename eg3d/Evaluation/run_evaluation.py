@@ -67,7 +67,7 @@ def run_evaluation(
     if run_generate_data:
         generate_data(save_name, network_folder, network_pkl_path, network_pkl, seed,truncation_psi, truncation_cutoff, no_img,age_model_name, ages, ages_id, angles_p, angles_y, scatter_iterations)
     
-    scatter_plot(network_folder, save_name, scatter_iterations)
+    scatter_plot(network_folder, save_name)
 
     angles_plot(save_name, angles_p, angles_y)
 
