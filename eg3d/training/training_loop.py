@@ -25,6 +25,7 @@ from torch_utils import misc
 from torch_utils import training_stats
 from torch_utils.ops import conv2d_gradfix
 from torch_utils.ops import grid_sample_gradfix
+import git
 
 import legacy
 from metrics import metric_main
@@ -273,6 +274,11 @@ def training_loop(
     G.register_buffer('dataset_label_std', torch.tensor(training_set.get_label_std()).to(device))
     D = dnnlib.util.construct_class_by_name(**D_kwargs, **common_kwargs).train().requires_grad_(False).to(device) # subclass of torch.nn.Module
     G_ema = copy.deepcopy(G).eval()
+
+    # Print commit sha
+    repo = git.Repo(search_parent_directories=True)
+    sha = repo.head.object.hexsha
+    print(f'Git commite sha: {sha}')
     
     # Resume from existing pickle.
     if (resume_pkl is not None) and (rank == 0):
