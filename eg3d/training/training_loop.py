@@ -276,9 +276,14 @@ def training_loop(
     G_ema = copy.deepcopy(G).eval()
 
     # Print commit sha
-    repo = git.Repo(search_parent_directories=True)
-    sha = repo.head.object.hexsha
-    print(f'Git commite sha: {sha}')
+    if rank ==0:
+        try:
+            repo = git.Repo(search_parent_directories=True)
+            sha = repo.head.object.hexsha
+            branch = repo.active_branch
+            print(f'Active branch: {branch} \nGit commite sha: {sha}')
+        except:
+            print("Could not print git branch..")
     
     # Resume from existing pickle.
     if (resume_pkl is not None) and (rank == 0):
@@ -399,7 +404,11 @@ def training_loop(
             all_gen_c = [training_set.get_label(np.random.randint(len(training_set))) for _ in range(len(phases) * batch_size)]
             # replace age sampled from dataset.json with generated age between range
             if len(categories) > 1:
-                all_gen_c = [np.concatenate([gen_c_initial[:25], get_age_category(generate_age(age_min, age_max), categories, rmin=age_min, rmax=age_max)]) for gen_c_initial in all_gen_c]
+                cats = [0] * 101 # lav om
+                age = int(np.random.uniform(0,101))
+                cats[age] = 1
+                #all_gen_c = [np.concatenate([gen_c_initial[:25], get_age_category(generate_age(age_min, age_max), cats, rmin=age_min, rmax=age_max)]) for gen_c_initial in all_gen_c]
+                all_gen_c = [np.concatenate([gen_c_initial[:25], cats]) for gen_c_initial in all_gen_c]
             else:
                 all_gen_c = [np.concatenate([gen_c_initial[:-1], generate_age(age_min, age_max)]) for gen_c_initial in all_gen_c]
 

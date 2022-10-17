@@ -29,6 +29,9 @@ parser.add_argument("--age_max", help="",default=100)
 parser.add_argument("--neural_rendering_resolution_initial", help="", default=128)
 parser.add_argument("--categories", help="", default=[0])
 parser.add_argument("--id_model", help="", default="ArcFace")
+parser.add_argument("--alternate_losses", help="", default=False)
+parser.add_argument("--alternate_after", help="", default=100000)
+parser.add_argument("--initial_age_training", help="", default=0)
 
 
 args = parser.parse_args()
@@ -83,6 +86,9 @@ submit_script = template_text.format(
                         "neural_rendering_resolution_initial" : args.neural_rendering_resolution_initial,
                         "categories": args.categories,
                         "id_model": args.id_model,
+                        "alternate_losses": args.alternate_losses,
+                        "alternate_after": args.alternate_after,
+                        "initial_age_training": args.initial_age_training,
 
                     }
                 )
