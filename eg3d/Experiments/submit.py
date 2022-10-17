@@ -21,7 +21,6 @@ parser.add_argument("--age_scale", help="",default = '8')
 parser.add_argument("--age_loss_fn", help="", default="MSE")
 parser.add_argument("--id_scale", help="", default=10)
 parser.add_argument("--snap", help="How many ticks between saving a snapshot", default=50)
-parser.add_argument("--batch_division", help="", default=False)
 parser.add_argument("--freeze", help="", default=False)
 parser.add_argument("--age_version", help="", default='v2')
 parser.add_argument("--age_min", help="",default=0)
@@ -77,7 +76,6 @@ submit_script = template_text.format(
                         "age_loss_fn": args.age_loss_fn,
                         "id_scale": args.id_scale,
                         "snap": args.snap,
-                        "batch_division": args.batch_division,
                         "freeze": args.freeze,
                         "age_version": args.age_version,
                         "age_min": args.age_min,

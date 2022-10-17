@@ -44,4 +44,4 @@ source activate eg3d
 module load gcc/9.2.0
 module load cuda/11.1
 
-python train.py --outdir=./training-runs --cfg=ffhq --data={data} --gpus={gpu_num} --batch={batch_size} --gamma={gamma} --gen_pose_cond=True --age_scale={age_scale}  --age_loss_fn={age_loss_fn} --id_scale={id_scale} --snap={snap} --batch_division={batch_division} --freeze={freeze} --age_version={age_version} --age_min={age_min} --age_max={age_max} --neural_rendering_resolution_initial={neural_rendering_resolution_initial} --id_model={id_model} --alternate_losses={alternate_losses} --alternate_after={alternate_after} --initial_age_training={initial_age_training}"""
+python train.py --outdir=./training-runs --cfg=ffhq --data={data} --gpus={gpu_num} --batch={batch_size} --gamma={gamma} --gen_pose_cond=True --age_scale={age_scale}  --age_loss_fn={age_loss_fn} --id_scale={id_scale} --snap={snap} --freeze={freeze} --age_version={age_version} --age_min={age_min} --age_max={age_max} --neural_rendering_resolution_initial={neural_rendering_resolution_initial} --id_model={id_model} --alternate_losses={alternate_losses} --alternate_after={alternate_after} --initial_age_training={initial_age_training}"""

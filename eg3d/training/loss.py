@@ -263,7 +263,7 @@ class StyleGAN2Loss(Loss):
         logits = self.D(img, c, update_emas=update_emas)
         return logits
 
-    def accumulate_gradients(self, phase, real_img, real_c, gen_z, gen_c, gain, cur_nimg, age_scale=1, age_loss_fn="MSE", id_scale = 1, batch_division=False):
+    def accumulate_gradients(self, phase, real_img, real_c, gen_z, gen_c, gain, cur_nimg, age_scale=1, age_loss_fn="MSE", id_scale = 1):
         assert phase in ['Gmain', 'Greg', 'Gboth', 'Dmain', 'Dreg', 'Dboth']
         if self.G.rendering_kwargs.get('density_reg', 0) == 0:
             phase = {'Greg': 'none', 'Gboth': 'Gmain'}.get(phase, phase)
@@ -304,12 +304,9 @@ class StyleGAN2Loss(Loss):
                 if age_scale != 0:
                     age_loss = self.run_age_loss(gen_img, gen_c, loss_fn=age_loss_fn)
                 age_loss_scaled = age_loss * age_scale # age scaling
-                if not batch_division:
-                    if id_scale != 0:
-                        id_loss = self.run_id_loss(gen_img, gen_z, gen_c, c_swapped, neural_rendering_resolution, loss='cosine_similarity', margin=0.2, slope=10)
-                else:
-                    if id_scale != 0:
-                        id_loss = self.run_id_loss2(gen_img, gen_z, gen_c, loss='cosine_similarity')
+                
+                if id_scale != 0:
+                    id_loss = self.run_id_loss(gen_img, gen_z, gen_c, c_swapped, neural_rendering_resolution, loss='cosine_similarity', margin=0.2, slope=10)
 
                 id_loss_scaled = id_loss * id_scale # id scaling
                 loss_Gmain = torch.nn.functional.softplus(-gen_logits)

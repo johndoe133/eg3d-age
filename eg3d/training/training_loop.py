@@ -234,7 +234,6 @@ def training_loop(
     age_scale               = 1,        # Scales age loss
     age_loss_fn             = "MSE",    # Age loss function
     id_scale                = 1,        # Scales ID loss
-    batch_division          = True,     # Batch size remains the same but the IDs in the batch is halfed and the remaining are then duplicated. 
     freeze                  = False,    # If True, freezes weights of the synthesis and super resolution modules,
     age_version             = 'v2',     # Which version of the age estimator to use
     age_min                 = 0,        # Minimum age generated for training
@@ -431,7 +430,7 @@ def training_loop(
             for real_img, real_c, gen_z, gen_c in zip(phase_real_img, phase_real_c, phase_gen_z, phase_gen_c):
                 loss.accumulate_gradients(phase=phase.name, real_img=real_img, real_c=real_c, gen_z=gen_z, gen_c=gen_c, 
                                            gain=phase.interval, cur_nimg=cur_nimg, age_scale=age_scale, age_loss_fn = age_loss_fn, 
-                                           id_scale=id_scale, batch_division=batch_division)
+                                           id_scale=id_scale)
             phase.module.requires_grad_(False)
 
             # Update weights.
