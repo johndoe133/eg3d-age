@@ -154,17 +154,20 @@ def named_params_and_buffers(module):
     assert isinstance(module, torch.nn.Module)
     return list(module.named_parameters()) + list(module.named_buffers())
 
-def copy_params_and_buffers(src_module, dst_module, require_all=False):
+def copy_params_and_buffers(src_module, dst_module, require_all=False, age_loss_fn="MSE"):
     assert isinstance(src_module, torch.nn.Module)
     assert isinstance(dst_module, torch.nn.Module)
     src_tensors = dict(named_params_and_buffers(src_module))
+    age_ranges = 1
+    if age_loss_fn == "CAT":
+        age_ranges = 101
     for name, tensor in named_params_and_buffers(dst_module):
         assert (name in src_tensors) or (not require_all)
         if name in src_tensors:
             if (name == 'backbone.mapping.embed.weight' or name == 'mapping.embed.weight') and src_tensors[name].shape[-1] == 25:
-                src_tensors[name] = torch.nn.Parameter(torch.nn.functional.pad(input = src_tensors[name], pad=(0,1,0,0), mode='constant', value=0))
+                src_tensors[name] = torch.nn.Parameter(torch.nn.functional.pad(input = src_tensors[name], pad=(0,age_ranges,0,0), mode='constant', value=0))
             elif name == 'dataset_label_std' and src_tensors[name].shape[-1] == 25:
-                src_tensors[name] = torch.cat((src_tensors[name], torch.zeros(1)))
+                src_tensors[name] = torch.cat((src_tensors[name], torch.zeros(age_ranges)))
             
             tensor.copy_(src_tensors[name].detach()).requires_grad_(tensor.requires_grad)
 

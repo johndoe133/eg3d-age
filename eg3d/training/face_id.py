@@ -1,4 +1,76 @@
-# https://github.com/timesler/facenet-pytorch/blob/master/models/inception_resnet_v1.py
+import os
+import torch
+from torch import nn
+from torch.nn import functional as F
+import numpy as np
+import cv2
+import sys
+sys.path.append("/zhome/d7/6/127158/Documents/eg3d-age/eg3d")
+from networks.MagFace.network_inf import builder_inf
+import argparse
+
+class FaceIDLoss:
+    def __init__(self, device, model = "ArcFace", resize_img = True):
+        self.model = model
+        if self.model == "ArcFace":
+            self.id_model = InceptionResnetV1(pretrained='vggface2', device=device).requires_grad_(requires_grad=False).eval()
+            self.resize_shape = 160 # resize to 160 x 160
+        elif self.model == "MagFace":
+            # parser = argparse.ArgumentParser()
+            # parser.add_argument('--arch', default='iresnet100', type=str, help='backbone architechture')
+            # parser.add_argument('--embedding_size', default=512, type=int,help='The embedding feature size')
+            # parser.add_argument('--resume', default="./networks/MagFace/iResNet100_MagFace.pth", type=str, metavar='PATH', help='path to latest checkpoint')
+            # parser.add_argument('--cpu-mode', action='store_true', help='Use the CPU.')
+            # args = parser.parse_args()
+            class args_new:
+                arch = 'iresnet100'
+                embedding_size = 512
+                resume = "./networks/MagFace/iResNet100_MagFace.pth"
+                cpu_mode = None
+
+            self.id_model = builder_inf(args_new())
+            self.id_model = self.id_model.to(device).requires_grad_(requires_grad=False).eval()
+            self.resize_shape = 112 # resize to 112 x 112
+        self.resize_img = resize_img
+
+    def get_feature_vector(self, img):
+        if self.resize_img:
+            img_resize = self.resize(img)
+        else:
+            img_resize = img # no change
+        img_RGB = self.transform_to_RGB(img_resize)
+        feature_vector = self.id_model(img_RGB)
+        return feature_vector
+
+    def get_feature_vector_test(self, img):
+        if self.resize_img:
+            img_resize = self.resize(img)
+        else:
+            img_resize = img # no change
+        feature_vector = self.id_model(img_resize)
+        return feature_vector
+
+    def transform_to_RGB(self, img):
+        img255 = (img * 127.5 + 128).clamp(0, 255)
+
+        return img255.float()
+
+    def resize(self, img):
+        """Resize image tensor to fit age model
+
+        Args:
+            img (tensor): 
+
+        Returns:
+            tensor: resized tensor
+        """
+        return F.interpolate(img, [self.resize_shape, self.resize_shape],  mode='bilinear', align_corners=True)    
+    
+    def __repr__(self) -> str:
+        return f"{self.id_model} \n\n ID_model using {self.model}"
+
+    def __str__(self) -> str:
+        return f"{self.id_model} \n\n ID_model using {self.model}"
 
 # MIT License
 
@@ -16,45 +88,7 @@
 # WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE 
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-import os
-import torch
-from torch import nn
-from torch.nn import functional as F
-
-class FaceIDLoss:
-    def __init__(self, device, resize_img = True, resize_shape = 160):
-        self.id_model = InceptionResnetV1(pretrained='vggface2', device=device).requires_grad_(requires_grad=False).eval()
-        self.resize_img = resize_img
-        self.resize_shape = resize_shape
-
-    def get_feature_vector(self, img):
-        if self.resize_img:
-            img_resize = self.resize(img)
-        else:
-            img_resize = img # no change
-        img_RGB = self.transform_to_RGB(img_resize)
-        feature_vector = self.id_model(img_RGB)
-        return feature_vector
-
-    def transform_to_RGB(self, img):
-        img255 = (img * 127.5 + 128).clamp(0, 255).to(torch.uint8)
-
-        return img255.float()
-
-    def resize(self, img):
-        """Resize image tensor to fit age model
-
-        Args:
-            img (tensor): 
-
-        Returns:
-            tensor: resized tensor
-        """
-        return F.interpolate(img, [self.resize_shape, self.resize_shape],  mode='bilinear', align_corners=True)    
-
-    def get_loss(self, latent_chords, new_latent_chords):
-        pass
-
+# https://github.com/timesler/facenet-pytorch/blob/master/models/inception_resnet_v1.py
 class BasicConv2d(nn.Module):
     def __init__(self, in_planes, out_planes, kernel_size, stride, padding=0):
         super().__init__()
@@ -375,3 +409,27 @@ def get_torch_home():
         )
     )
     return torch_home
+
+
+if __name__=="__main__":
+    device = torch.device("cuda")
+    model = FaceIDLoss(device, model="MagFace")
+    p = '/zhome/d7/6/127158/Documents/eg3d-age/age-estimation-pytorch/in/img00000000.png'
+    p2 = '/zhome/d7/6/127158/Documents/eg3d-age/age-estimation-pytorch/in/img00000002.png'
+    image1 = cv2.imread(p)
+    image1 = cv2.cvtColor(image1, cv2.COLOR_BGR2RGB)
+    img_tensor = torch.from_numpy(image1)
+    img_tensor = img_tensor.to(device)
+    print(img_tensor.permute(2,0,1)[None,:,:,:].shape)
+    v1 = model.get_feature_vector_test(img_tensor.permute(2,0,1)[None,:,:,:].float())
+
+    image2 = cv2.imread(p2)
+    image2 = cv2.cvtColor(image2, cv2.COLOR_BGR2RGB)
+    img_tensor2 = torch.from_numpy(image2)
+    img_tensor2 = img_tensor2.to(device)
+    v2 = model.get_feature_vector_test(img_tensor2.permute(2,0,1)[None,:,:,:].float())
+
+    cosine_sim_f = torch.nn.CosineSimilarity()
+    print("SIM:", cosine_sim_f(v1, v2))
+    print("Norm", np.linalg.norm(v2.detach().cpu().numpy()))
+

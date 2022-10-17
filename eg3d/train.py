@@ -26,6 +26,17 @@ from training import training_loop
 from metrics import metric_main
 from torch_utils import training_stats
 from torch_utils import custom_ops
+import ast
+
+#----------------------------------------------------------------------------
+
+class PythonLiteralOption(click.Option):
+
+    def type_cast_value(self, ctx, value):
+        try:
+            return ast.literal_eval(value)
+        except:
+            raise click.BadParameter(value)
 
 #----------------------------------------------------------------------------
 
@@ -60,9 +71,8 @@ def launch_training(c, desc, outdir, dry_run, resume=None):
     prev_run_parent_dirs = []
     if os.path.isdir(outdir):
         prev_run_parent_dirs = [x for x in os.listdir(outdir) if os.path.isdir(os.path.join(outdir, x))]
-
-    if resume and resume.split('/')[-1] != 'ffhqrebalanced512-64.pkl':
-        # /training-runs/parent_run_name/00003-ffhq-FFHQ_512_6_balanced-gpus2-batch8-gamma5/network-snapshot-0000.pkl
+    
+    if resume and resume.split('/')[-1] not in ['ffhqrebalanced512-64.pkl', 'ffhqrebalanced512-128.pkl']:
         if len(resume.split('/')) >= 3:
             run_parent = resume.split('/')[-3]
             if run_parent in prev_run_parent_dirs:
@@ -117,9 +127,18 @@ def launch_training(c, desc, outdir, dry_run, resume=None):
 
 #----------------------------------------------------------------------------
 
-def init_dataset_kwargs(data):
+def init_dataset_kwargs(data, loss_fn_name):
+    # Added so that the dataset.json files containing the conditioning parameters
+    # will follow the type of age loss function used. 
+    if loss_fn_name == 'MSE':
+        file_name = 'dataset_mse.json'
+    elif loss_fn_name == 'CAT':
+        file_name = 'dataset_cat.json' 
+    else:
+        file_name == 'dataset.json'
+    print(f"Loading labels from file: {file_name}...")
     try:
-        dataset_kwargs = dnnlib.EasyDict(class_name='training.dataset.ImageFolderDataset', path=data, use_labels=True, max_size=None, xflip=False)
+        dataset_kwargs = dnnlib.EasyDict(class_name='training.dataset.ImageFolderDataset', path=data, use_labels=True, max_size=None, xflip=False, file_name=file_name)
         dataset_obj = dnnlib.util.construct_class_by_name(**dataset_kwargs) # Subclass of training.dataset.Dataset.
         dataset_kwargs.resolution = dataset_obj.resolution # Be explicit about resolution.
         dataset_kwargs.use_labels = dataset_obj.has_labels # Be explicit about labels.
@@ -205,14 +224,19 @@ def parse_comma_separated_list(s):
 @click.option('--density_reg_p_dist',    help='density regularization strength.', metavar='FLOAT', type=click.FloatRange(min=0), default=0.004, required=False, show_default=True)
 @click.option('--reg_type', help='Type of regularization', metavar='STR',  type=click.Choice(['l1', 'l1-alt', 'monotonic-detach', 'monotonic-fixed', 'total-variation']), required=False, default='l1')
 @click.option('--decoder_lr_mul',    help='decoder learning rate multiplier.', metavar='FLOAT', type=click.FloatRange(min=0), default=1, required=False, show_default=True)
+
+# Age settings
 @click.option('--age_scale',    help='Scales age loss.', metavar='FLOAT', default=1.0, required=False, show_default=True)
 @click.option('--id_scale',    help='Scales id loss.', metavar='FLOAT', default=10.0, required=False, show_default=True)
 @click.option('--age_loss_fn',    help='Type of age loss function', metavar='STR', default="MSE", required=False)
-@click.option('--batch_division', help='If batch should be divided in half and doubled again so that there is two of each id', metavar='BOOL', default=False, required=False)
 @click.option('--freeze', help='Freeze parameters of volume synthesis and super resolution modules', metavar='BOOL', default=False, required=False)
 @click.option('--age_version', help='What version of the age estimator to use', type=str, default="v2", required=False)
 @click.option('--age_min', help='Minimum age to generate random ages from', type=int, default=0, required=False)
 @click.option('--age_max', help='Maximum age to generate random ages from', type=int, default=100, required=False)
+@click.option('--id_model', help='What ID model to use. Choose between ArcFace and MagFace. ', type=str, required=False, default='ArcFace')
+@click.option('--alternate_losses', help='Alternate between running age_loss and ID_loss', type=bool, required=False, default=False)
+@click.option('--alternate_after', help='After how many images age_loss/id_loss should train before alternating', type=int, required=False, default=100000)
+@click.option('--initial_age_training', help='For how many images we should initally only train using age_loss', type=int, required=False, default=0)
 
 
 def main(**kwargs):
@@ -249,7 +273,7 @@ def main(**kwargs):
     c.data_loader_kwargs = dnnlib.EasyDict(pin_memory=True, prefetch_factor=2)
 
     # Training set.
-    c.training_set_kwargs, dataset_name = init_dataset_kwargs(data=opts.data)
+    c.training_set_kwargs, dataset_name = init_dataset_kwargs(data=opts.data, loss_fn_name=opts.age_loss_fn)
     if opts.cond and not c.training_set_kwargs.use_labels:
         raise click.ClickException('--cond=True requires labels specified in dataset.json')
     c.training_set_kwargs.use_labels = opts.cond
@@ -276,11 +300,17 @@ def main(**kwargs):
     c.age_scale = opts.age_scale
     c.id_scale = opts.id_scale
     c.age_loss_fn = opts.age_loss_fn
-    c.batch_division = opts.batch_division
+    c.loss_kwargs.age_loss_fn = opts.age_loss_fn
     c.freeze = opts.freeze
     c.loss_kwargs.age_version = opts.age_version
+    c.loss_kwargs.id_model = opts.id_model
+    c.loss_kwargs.age_min = opts.age_min
+    c.loss_kwargs.age_max = opts.age_max
     c.age_min = opts.age_min
     c.age_max = opts.age_max
+    c.loss_kwargs.alternate_losses = opts.alternate_losses
+    c.loss_kwargs.alternate_after = opts.alternate_after
+    c.loss_kwargs.initial_age_training = opts.initial_age_training
 
     # Sanity checks.
     if c.batch_size % c.num_gpus != 0:

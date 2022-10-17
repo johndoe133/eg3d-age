@@ -117,6 +117,7 @@ def generate_images(
     axs1.fill_between(x, loss_age - loss_age_std, loss_age + loss_age_std, alpha=0.4, label="std")
     axs1.set_title("With $age_{scale}$ = " + str(age_scale))
     axs1.legend(loc='upper right')
+    axs1.grid(visible=True, axis="y", zorder=0)
 
     ## ID LOSS ##
     axs2.plot(x, loss_id, label="Loss")
@@ -130,6 +131,7 @@ def generate_images(
     axs2.fill_between(x, loss_id - loss_id_std, loss_id + loss_id_std, alpha=0.4, label="std")
     axs2.set_title("With $id_{scale}$ = " + str(id_scale))
     axs2.legend(loc='upper right')
+    axs2.grid(visible=True, axis="y", zorder=0)
 
     ## GENERATOR LOSS ##
     axs3.set_ylabel("$\mathcal{L}_{G}$")
@@ -137,7 +139,8 @@ def generate_images(
     axs3.fill_between(x, loss_G - loss_G_std, loss_G + loss_G_std, alpha=0.4, label="std")
     axs3.set_ylim(0,max(loss_G + loss_G_std)*1.10)
     axs3.plot(x, loss_G, label="Loss")
-    axs3.legend(loc='upper right')    
+    axs3.legend(loc='upper right')  
+    axs3.grid(visible=True, axis="y", zorder=0)  
 
     ## DISCRIMINATOR LOSS ##
     axs4.plot(x, loss_D, label="Loss")
@@ -147,6 +150,7 @@ def generate_images(
     axs4.set_ylim(0,max(loss_D + loss_D_std)*1.10)
     axs4.fill_between(x, loss_D - loss_D_std, loss_D + loss_D_std, alpha=0.4, label="std")
     axs4.legend(loc='upper right')
+    axs4.grid(visible=True, axis="y", zorder=0)
 
     fig.subplots_adjust(hspace=0)
 

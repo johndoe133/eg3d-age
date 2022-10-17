@@ -7,7 +7,7 @@ from visualize_pti import visualize
 import click
 import numpy as np
 from configs import paths_config, hyperparameters, global_config
-
+import time
 def normalize(x, rmin = 5, rmax = 80, tmin = -1, tmax = 1):
     """Defined in eg3d.training.training_loop
     """
@@ -31,6 +31,7 @@ def pti_pipeline(
     pti_iterations: int,
     run_pti_inversion: bool,
 ):
+    start_time = time.time()
     hyperparameters.first_inv_steps = w_iterations
     hyperparameters.max_pti_steps = pti_iterations
 
@@ -41,10 +42,12 @@ def pti_pipeline(
 
     c = run(model_path, image_name, run_pti_inversion)
 
+    end_time = time.time()
+    print(f"Optimization run time: {int(end_time - start_time)} seconds")
+    print("Saving images...")
     visualize(image_name, c)
     print(f"See output in folder eg3d/PTI/output/{image_name}")
 
     edit_age(image_name, model_path, c)
-
 if __name__ == "__main__":
     pti_pipeline()

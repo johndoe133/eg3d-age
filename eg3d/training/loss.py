@@ -21,6 +21,7 @@ from training.estimate_age import AgeEstimator, AgeEstimatorNew
 import time
 from training.face_id import FaceIDLoss
 import random
+from training.training_loop import normalize
 
 #----------------------------------------------------------------------------
 
@@ -36,7 +37,9 @@ class StyleGAN2Loss(Loss):
                     blur_init_sigma=0, blur_fade_kimg=0, r1_gamma_init=0, r1_gamma_fade_kimg=0, 
                     neural_rendering_resolution_initial=64, neural_rendering_resolution_final=None, 
                     neural_rendering_resolution_fade_kimg=0, gpc_reg_fade_kimg=1000, gpc_reg_prob=None, 
-                    dual_discrimination=False, filter_mode='antialiased', age_version='v2'):
+                    dual_discrimination=False, filter_mode='antialiased', age_version='v2', 
+                    age_min=0, age_max=100, id_model="ArcFace", alternate_losses=False, alternate_after=100000,
+                    initial_age_training=0, age_loss_fn = "MSE"):
         super().__init__()
         self.device             = device
         self.G                  = G
@@ -64,18 +67,26 @@ class StyleGAN2Loss(Loss):
         self.blur_raw_target = True
         self.age_loss_MSE = torch.nn.MSELoss()
         self.age_loss_L1 = torch.nn.L1Loss()
+        self.cross_entropy_loss = torch.nn.CrossEntropyLoss()
         self.cosine_sim = torch.nn.CosineSimilarity()
-        self.id_model = FaceIDLoss(device)
+        self.id_model = FaceIDLoss(device, model = id_model)
+        self.age_loss_fn = age_loss_fn
         self.age_version = age_version
+        self.age_min = age_min
+        self.age_max = age_max
         if age_version == 'v1':
-            self.age_model = AgeEstimator()
+            self.age_model = AgeEstimator(age_min=self.age_min, age_max=self.age_max)
         elif age_version == "v2":
-            self.age_model = AgeEstimatorNew(self.device)
-            
+            self.age_model = AgeEstimatorNew(self.device, age_min=self.age_min, age_max=self.age_max)
+        self.alternate_losses = alternate_losses
+        self.alternate_after = alternate_after
+        self.initial_age_training = initial_age_training
+
+
         assert self.gpc_reg_prob is None or (0 <= self.gpc_reg_prob <= 1)
 
 
-    def run_age_loss(self, imgs, c, loss="MSE"):
+    def run_age_loss(self, imgs, c, loss_fn="MSE"):
         """Returns the age loss given a series of generated images and the age the synthetic images
         are suppose to resemble.
 
@@ -91,15 +102,21 @@ class StyleGAN2Loss(Loss):
             tensor: loss
         """
         images = imgs['image']
-        predicted_ages = self.age_model.estimate_age(images.clone())
+        predicted_ages, logits = self.age_model.estimate_age(images.clone())
         predicted_ages = predicted_ages.to(self.device)
-        ages = c[:,-1].clone()
-        if loss == "MSE":
+        if loss_fn == "MSE":
+            ages = c[:,-1].clone()
             loss = self.age_loss_MSE(predicted_ages, ages) 
-        elif loss =="MAE" or loss=="L1":
+        elif loss_fn =="MAE" or loss_fn=="L1":
+            ages = c[:,-1].clone()
             loss = self.age_loss_L1(predicted_ages, ages)
+        elif loss_fn =="CAT":
+            ages = c[:,25:].clone()
+            loss = self.cross_entropy_loss(logits, ages)
+
         else:
             raise NotImplementedError
+        
         return loss
 
     def pairwise(self, iterable):
@@ -119,36 +136,63 @@ class StyleGAN2Loss(Loss):
             total_loss += loss
 
         return total_loss
+
     def run_id_loss(self, imgs, z, c, c_swapped, neural_rendering_resolution, margin=0.2, loss='MSE', update_emas=False, slope=10):
         """Returns the identity loss of a subject by comparing the given images to the 
         images aged and young-ified. 
         
         """
         images = imgs['image']
-        ages = c[:,-1].clone()
+        
+        if self.age_loss_fn == "MSE": # not using age categories
+            ages = c[:,-1].clone()
+            random_ages = []
 
-        random_ages = []
-
-        for age in ages:
-            new_age = random.uniform(-1,1)
-            while np.abs(age.item() - new_age) < margin:
+            for age in ages:
                 new_age = random.uniform(-1,1)
-            random_ages.append(new_age)
+                while np.abs(age.item() - new_age) < margin:
+                    new_age = random.uniform(-1, 1)
+                random_ages.append(new_age)
 
-        new_c_swapped = c_swapped.clone() # used for the G.mapping step so the "scene identity" is preserved
-        new_c_swapped[:,-1] = torch.tensor(random_ages)
+            new_c_swapped = c_swapped.clone() # used for the G.mapping step so the "scene identity" is preserved
+            new_c_swapped[:,-1] = torch.tensor(random_ages)
 
-        new_c = c.clone() # used for G.synthesis so that the camera angle is preserved
-        new_c[:, -1] = torch.tensor(random_ages)
-        
+            new_c = c.clone() # used for G.synthesis so that the camera angle is preserved
+            new_c[:, -1] = torch.tensor(random_ages)
+
+        else: # ages are categorized
+            ages = c[:,25:].clone() # categories size [batch_size, len(categories) - 1]
+            categories=list(range(101)) 
+            left = torch.bucketize(self.age_min, torch.tensor(categories, device = self.device), right=False).item()
+            right = torch.bucketize(self.age_max, torch.tensor(categories, device = self.device), right=True).item()
+
+            j = torch.arange(ages.size(0)).long().to(self.device) # used to index
+
+            number_of_age_ranges = right - left
+
+            p = 1/(number_of_age_ranges - 1) # probability of choosing another category
+            probabilities = torch.full_like(ages, p).to(self.device)
+            probabilities[ages.bool()] = 0 # uniform probability of choosing another category except for the one it was before
+            probabilities[j,:left]=0 # dont pick ranges less than age_min
+            probabilities[j,right:]=0 # dont pick ranges bigger than age_max
+            idx = probabilities.multinomial(1, False).flatten().to(self.device) # choosing the index of the new category
+            new_categories = torch.zeros_like(ages).to(self.device)
+            new_categories[j, idx] = 1
+
+            new_c_swapped = c_swapped.clone() # used for the G.mapping step so the "scene identity" is preserved
+            new_c_swapped[:, 25:] = new_categories
+
+            new_c = c.clone() # used for G.synthesis so that the camera angle is preserved
+            new_c[:, 25:] = new_categories
+
         ws = self.G.mapping(z, new_c_swapped)
-        
+
         gen_img = self.G.synthesis(ws, new_c, neural_rendering_resolution=neural_rendering_resolution, update_emas=update_emas)
         new_images = gen_img['image']
 
         latent_coords = self.id_model.get_feature_vector(images)
         new_latent_coords = self.id_model.get_feature_vector(new_images)
-        
+
         if loss=='MSE':
             return self.age_loss_MSE(latent_coords, new_latent_coords)
         elif loss == 'cosine_similarity':
@@ -158,7 +202,32 @@ class StyleGAN2Loss(Loss):
         else:
             raise NotImplementedError
 
+    def alternate_scales(self, cur_nimg, age_scale, id_scale, inital_age_training_nimg = 200000, alternate_loop = 200000):
+        """Help alternate between training aging and ID preservation.
 
+        Args:
+            cur_nimg (int): current number of images trained on
+            age_scale (float): predefined age_scale
+            id_scale (float): predefined id_scale
+            inital_age_training_nimg (int, optional): How many initial images should be used to only train aging. Defaults to 200000.
+            alternate_loop (int, optional): Total number of images used to train both aging and ID preservation
+            in an "alternating loop" The first alternate_loop/2 are used to train ID the next alternate_loop/2 to train aging. Defaults to 200000.
+
+        Returns:
+            (age_scale, id_scale): updated scaling parameters
+        """
+        alternate_loop = 2 * self.alternate_after
+        if id_scale != 0:
+            if cur_nimg > self.initial_age_training:
+                if (cur_nimg % alternate_loop) < alternate_loop//2:
+                    # train id
+                    age_scale = 0
+                else:
+                    # train age
+                    id_scale = 0
+            else:
+                id_scale = 0
+        return age_scale, id_scale
 
     def run_G(self, z, c, swapping_prob, neural_rendering_resolution, update_emas=False):
         if swapping_prob is not None:
@@ -194,7 +263,7 @@ class StyleGAN2Loss(Loss):
         logits = self.D(img, c, update_emas=update_emas)
         return logits
 
-    def accumulate_gradients(self, phase, real_img, real_c, gen_z, gen_c, gain, cur_nimg, age_scale=1, age_loss_fn="MSE", id_scale = 1, batch_division=False):
+    def accumulate_gradients(self, phase, real_img, real_c, gen_z, gen_c, gain, cur_nimg, age_scale=1, age_loss_fn="MSE", id_scale = 1):
         assert phase in ['Gmain', 'Greg', 'Gboth', 'Dmain', 'Dreg', 'Dboth']
         if self.G.rendering_kwargs.get('density_reg', 0) == 0:
             phase = {'Greg': 'none', 'Gboth': 'Gmain'}.get(phase, phase)
@@ -225,14 +294,20 @@ class StyleGAN2Loss(Loss):
         # Gmain: Maximize logits for generated images.
         if phase in ['Gmain', 'Gboth']:
             with torch.autograd.profiler.record_function('Gmain_forward'):
+                #initialize losses
+                age_loss, id_loss = torch.Tensor([0]).to(self.device), torch.Tensor([0]).to(self.device)
+
+                age_scale, id_scale = self.alternate_scales(cur_nimg, age_scale, id_scale) if self.alternate_losses else (age_scale, id_scale)
+
                 gen_img, gen_ws, c_swapped = self.run_G(gen_z, gen_c, swapping_prob=swapping_prob, neural_rendering_resolution=neural_rendering_resolution)
                 gen_logits = self.run_D(gen_img, gen_c, blur_sigma=blur_sigma)
-                age_loss = self.run_age_loss(gen_img, gen_c, loss=age_loss_fn)
+                if age_scale != 0:
+                    age_loss = self.run_age_loss(gen_img, gen_c, loss_fn=age_loss_fn)
                 age_loss_scaled = age_loss * age_scale # age scaling
-                if not batch_division:
+                
+                if id_scale != 0:
                     id_loss = self.run_id_loss(gen_img, gen_z, gen_c, c_swapped, neural_rendering_resolution, loss='cosine_similarity', margin=0.2, slope=10)
-                else:
-                    id_loss = self.run_id_loss2(gen_img, gen_z, gen_c, loss='cosine_similarity')
+
                 id_loss_scaled = id_loss * id_scale # id scaling
                 loss_Gmain = torch.nn.functional.softplus(-gen_logits)
 
@@ -244,7 +319,7 @@ class StyleGAN2Loss(Loss):
                 
             with torch.autograd.profiler.record_function('Gmain_backward'):
                 (loss_Gmain.mean() + (age_loss_scaled) + (id_loss_scaled)).mul(gain).backward() # added age loss and id loss
-
+                
         # Density Regularization
         if phase in ['Greg', 'Gboth'] and self.G.rendering_kwargs.get('density_reg', 0) > 0 and self.G.rendering_kwargs['reg_type'] == 'l1':
             if swapping_prob is not None:
