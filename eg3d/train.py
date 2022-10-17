@@ -133,7 +133,7 @@ def init_dataset_kwargs(data, loss_fn_name):
     if loss_fn_name == 'MSE':
         file_name = 'dataset_mse.json'
     elif loss_fn_name == 'CAT':
-        file_name = 'dataset_cat.json'
+        file_name = 'dataset_cat.json' 
     else:
         file_name == 'dataset.json'
     print(f"Loading labels from file: {file_name}...")
@@ -234,8 +234,11 @@ def parse_comma_separated_list(s):
 @click.option('--age_version', help='What version of the age estimator to use', type=str, default="v2", required=False)
 @click.option('--age_min', help='Minimum age to generate random ages from', type=int, default=0, required=False)
 @click.option('--age_max', help='Maximum age to generate random ages from', type=int, default=100, required=False)
-@click.option('--categories', help='Age categories. ', cls=PythonLiteralOption, required=False, default='[0]')
 @click.option('--id_model', help='What ID model to use. Choose between ArcFace and MagFace. ', type=str, required=False, default='ArcFace')
+@click.option('--alternate_losses', help='Alternate between running age_loss and ID_loss', type=bool, required=False, default=False)
+@click.option('--alternate_after', help='After how many images age_loss/id_loss should train before alternating', type=int, required=False, default=100000)
+@click.option('--initial_age_training', help='For how many images we should initally only train using age_loss', type=int, required=False, default=0)
+
 
 def main(**kwargs):
     """Train a GAN using the techniques described in the paper
@@ -298,6 +301,7 @@ def main(**kwargs):
     c.age_scale = opts.age_scale
     c.id_scale = opts.id_scale
     c.age_loss_fn = opts.age_loss_fn
+    c.loss_kwargs.age_loss_fn = opts.age_loss_fn
     c.batch_division = opts.batch_division
     c.freeze = opts.freeze
     c.loss_kwargs.age_version = opts.age_version
@@ -306,8 +310,9 @@ def main(**kwargs):
     c.loss_kwargs.age_max = opts.age_max
     c.age_min = opts.age_min
     c.age_max = opts.age_max
-    c.categories = opts.categories
-    c.loss_kwargs.categories = opts.categories
+    c.loss_kwargs.alternate_losses = opts.alternate_losses
+    c.loss_kwargs.alternate_after = opts.alternate_after
+    c.loss_kwargs.initial_age_training = opts.initial_age_training
 
     # Sanity checks.
     if c.batch_size % c.num_gpus != 0:
