@@ -17,15 +17,14 @@ import dlib
 import cv2
 
 class AgeEstimatorNew():
-    """Takes the device and a list of age categories as input. If age categories
-    are not used then the input should be `[0]`. 
+    """Takes the device as input.
     """
-    def __init__(self, device, categories = [0], age_min=0, age_max=100):
+    def __init__(self, device, age_min=0, age_max=100):
         root = os.path.expanduser('~')
         model = get_model(model_name=cfg.MODEL.ARCH, pretrained=None)
         self.age_model = model.to(device)
         pretrained_model_path = os.path.join(root, "Documents/eg3d-age/eg3d/networks/yu4u.pth")
-        checkpoint = torch.load(pretrained_model_path)#, map_location="cpu")
+        checkpoint = torch.load(pretrained_model_path)
         self.age_model.load_state_dict(checkpoint['state_dict'])
         self.age_model.requires_grad_(requires_grad=False) 
         self.age_model.eval()
@@ -34,7 +33,6 @@ class AgeEstimatorNew():
         self.detector = dlib.get_frontal_face_detector()
         self.img_size = 224
         self.ages = torch.arange(0,101, device = self.device)
-        self.categories = categories
         self.age_min = age_min
         self.age_max = age_max
     
@@ -68,8 +66,8 @@ class AgeEstimatorNew():
         outputs = F.softmax(logits, dim=-1)
         predicted_ages = (outputs * self.ages).sum(axis=-1)
 
-        if len(self.categories) > 1:
-            logits = self.categorize_logits(logits)
+        # if len(self.categories) > 1:
+        #     logits = self.categorize_logits(logits) unused
 
         if normalize:
             return self.normalize_ages(predicted_ages, rmin=self.age_min, rmax=self.age_max), logits

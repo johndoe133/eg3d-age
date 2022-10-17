@@ -73,7 +73,7 @@ def setup_snapshot_image_grid(training_set, random_seed=0):
 
 #----------------------------------------------------------------------------
 
-def save_image_grid(img, fname, drange, grid_size, ages=None, categories = None, age_min=0, age_max=100):
+def save_image_grid(img, fname, drange, grid_size, ages=None, age_loss_fn = "MSE", age_min=0, age_max=100):
     lo, hi = drange
     img = np.asarray(img, dtype=np.float32)
     img = (img - lo) * (255 / (hi - lo))
@@ -86,7 +86,7 @@ def save_image_grid(img, fname, drange, grid_size, ages=None, categories = None,
     img = img.reshape([gh * H, gw * W, C]) # 15 pics wide, 8 tall
 
     font = ImageFont.truetype("FreeSerif.ttf", 48)
-
+    categories = list(range(101))
     assert C in [1, 3]
     if C == 1:
         img_grid = PIL.Image.fromarray(img[:, :, 0], 'L')
@@ -96,9 +96,9 @@ def save_image_grid(img, fname, drange, grid_size, ages=None, categories = None,
                 counter = 0
                 for r in range(gh):
                     for c in range(gw):
-                        if len(categories) > 1:
+                        if age_loss_fn == "CAT":
                             index = ages[counter]
-                            text = f"{categories[index]} - {categories[index+1]}"
+                            text = f"{categories[index]}"
                         else:
                             text = str(int(denormalize(ages[counter], rmin=age_min, rmax=age_max)))
                         text_added.text((c*H,r*W), text, font=font) 
@@ -112,9 +112,9 @@ def save_image_grid(img, fname, drange, grid_size, ages=None, categories = None,
                 counter = 0
                 for r in range(gh):
                     for c in range(gw):
-                        if len(categories) > 1:
+                        if age_loss_fn == "CAT":
                             index = int(ages[counter])
-                            text = f"{categories[index]} - {categories[index+1]}"
+                            text = f"{categories[index]}"
                         else:
                             text = str(int(denormalize(ages[counter], rmin=age_min, rmax=age_max)))
                         text_added.text((c*H,r*W), text, font=font) 
@@ -239,7 +239,6 @@ def training_loop(
     age_version             = 'v2',     # Which version of the age estimator to use
     age_min                 = 0,        # Minimum age generated for training
     age_max                 = 100,      # Maximum age generated for training
-    categories              = None,     # Age categories. None if age is a scalar
 ):
     # Initialize.
     start_time = time.time()
@@ -291,9 +290,7 @@ def training_loop(
         with dnnlib.util.open_url(resume_pkl) as f:
             resume_data = legacy.load_network_pkl(f)
         for name, module in [('G', G), ('D', D), ('G_ema', G_ema)]:
-            if categories is None:
-                categories = [0]
-            misc.copy_params_and_buffers(resume_data[name], module, require_all=False, categories=categories)
+            misc.copy_params_and_buffers(resume_data[name], module, require_all=False, age_loss_fn=age_loss_fn)
 
     if freeze:
         # freeze synthesis and superres weights
@@ -403,12 +400,13 @@ def training_loop(
             all_gen_z = [phase_gen_z.split(batch_gpu) for phase_gen_z in all_gen_z.split(batch_size)]
             all_gen_c = [training_set.get_label(np.random.randint(len(training_set))) for _ in range(len(phases) * batch_size)]
             # replace age sampled from dataset.json with generated age between range
-            if len(categories) > 1:
-                cats = [0] * 101 # lav om
-                age = int(np.random.uniform(0,101))
-                cats[age] = 1
-                #all_gen_c = [np.concatenate([gen_c_initial[:25], get_age_category(generate_age(age_min, age_max), cats, rmin=age_min, rmax=age_max)]) for gen_c_initial in all_gen_c]
-                all_gen_c = [np.concatenate([gen_c_initial[:25], cats]) for gen_c_initial in all_gen_c]
+            if age_loss_fn == "CAT":
+                pass
+                # cats = [0] * 101 # lav om
+                # age = np.random.randint(age_min, age_max + 1)
+                # cats[age] = 1
+                # #all_gen_c = [np.concatenate([gen_c_initial[:25], get_age_category(generate_age(age_min, age_max), cats, rmin=age_min, rmax=age_max)]) for gen_c_initial in all_gen_c]
+                # all_gen_c = [np.concatenate([gen_c_initial[:25], cats]) for gen_c_initial in all_gen_c]
             else:
                 all_gen_c = [np.concatenate([gen_c_initial[:-1], generate_age(age_min, age_max)]) for gen_c_initial in all_gen_c]
 
@@ -516,12 +514,12 @@ def training_loop(
             images_depth = -torch.cat([o['image_depth'].cpu() for o in out]).numpy()
             ages = []
             for c in grid_c:
-                if categories != [0]:
+                if age_loss_fn == "CAT":
                     indices = torch.where(c[:, 25:] == 1)[1] # indices of the starting age category
                     ages += (list(indices.cpu().detach().numpy()))
                 else:
                     ages += (list(c[:,25].cpu().detach().numpy()))
-            save_image_grid(images, os.path.join(run_dir, f'fakes{cur_nimg//1000:06d}.png'), drange=[-1,1], grid_size=grid_size, ages=ages, categories=categories, age_min=age_min, age_max=age_max)
+            save_image_grid(images, os.path.join(run_dir, f'fakes{cur_nimg//1000:06d}.png'), drange=[-1,1], grid_size=grid_size, ages=ages, age_loss_fn=age_loss_fn, age_min=age_min, age_max=age_max)
             save_image_grid(images_raw, os.path.join(run_dir, f'fakes{cur_nimg//1000:06d}_raw.png'), drange=[-1,1], grid_size=grid_size, ages=ages)
             save_image_grid(images_depth, os.path.join(run_dir, f'fakes{cur_nimg//1000:06d}_depth.png'), drange=[images_depth.min(), images_depth.max()], grid_size=grid_size, ages=ages)
 

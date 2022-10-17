@@ -154,13 +154,13 @@ def named_params_and_buffers(module):
     assert isinstance(module, torch.nn.Module)
     return list(module.named_parameters()) + list(module.named_buffers())
 
-def copy_params_and_buffers(src_module, dst_module, require_all=False, categories=[0]):
+def copy_params_and_buffers(src_module, dst_module, require_all=False, age_loss_fn="MSE"):
     assert isinstance(src_module, torch.nn.Module)
     assert isinstance(dst_module, torch.nn.Module)
     src_tensors = dict(named_params_and_buffers(src_module))
     age_ranges = 1
-    if len(categories) > 1:
-        age_ranges = len(categories) - 1
+    if age_loss_fn == "CAT":
+        age_ranges = 101
     for name, tensor in named_params_and_buffers(dst_module):
         assert (name in src_tensors) or (not require_all)
         if name in src_tensors:

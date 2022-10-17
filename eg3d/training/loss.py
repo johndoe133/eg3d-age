@@ -37,9 +37,9 @@ class StyleGAN2Loss(Loss):
                     blur_init_sigma=0, blur_fade_kimg=0, r1_gamma_init=0, r1_gamma_fade_kimg=0, 
                     neural_rendering_resolution_initial=64, neural_rendering_resolution_final=None, 
                     neural_rendering_resolution_fade_kimg=0, gpc_reg_fade_kimg=1000, gpc_reg_prob=None, 
-                    dual_discrimination=False, filter_mode='antialiased', age_version='v2', categories=[0], 
+                    dual_discrimination=False, filter_mode='antialiased', age_version='v2', 
                     age_min=0, age_max=100, id_model="ArcFace", alternate_losses=False, alternate_after=100000,
-                    initial_age_training=0):
+                    initial_age_training=0, age_loss_fn = "MSE"):
         super().__init__()
         self.device             = device
         self.G                  = G
@@ -70,14 +70,14 @@ class StyleGAN2Loss(Loss):
         self.cross_entropy_loss = torch.nn.CrossEntropyLoss()
         self.cosine_sim = torch.nn.CosineSimilarity()
         self.id_model = FaceIDLoss(device, model = id_model)
+        self.age_loss_fn = age_loss_fn
         self.age_version = age_version
-        self.categories = categories
         self.age_min = age_min
         self.age_max = age_max
         if age_version == 'v1':
             self.age_model = AgeEstimator(age_min=self.age_min, age_max=self.age_max)
         elif age_version == "v2":
-            self.age_model = AgeEstimatorNew(self.device, categories = self.categories, age_min=self.age_min, age_max=self.age_max)
+            self.age_model = AgeEstimatorNew(self.device, age_min=self.age_min, age_max=self.age_max)
         self.alternate_losses = alternate_losses
         self.alternate_after = alternate_after
         self.initial_age_training = initial_age_training
@@ -143,9 +143,8 @@ class StyleGAN2Loss(Loss):
         
         """
         images = imgs['image']
-        number_of_categories = len(self.categories)
         
-        if number_of_categories == 1: # not using age categories
+        if self.age_loss_fn == "MSE": # not using age categories
             ages = c[:,-1].clone()
             random_ages = []
 
@@ -161,11 +160,11 @@ class StyleGAN2Loss(Loss):
             new_c = c.clone() # used for G.synthesis so that the camera angle is preserved
             new_c[:, -1] = torch.tensor(random_ages)
 
-        elif number_of_categories > 1: # ages are categorized
+        else: # ages are categorized
             ages = c[:,25:].clone() # categories size [batch_size, len(categories) - 1]
-            self.categories=list(range(101)) # lav om
-            left = torch.bucketize(self.age_min, torch.tensor(self.categories, device = self.device), right=False).item()
-            right = torch.bucketize(self.age_max, torch.tensor(self.categories, device = self.device), right=True).item()
+            categories=list(range(101)) 
+            left = torch.bucketize(self.age_min, torch.tensor(categories, device = self.device), right=False).item()
+            right = torch.bucketize(self.age_max, torch.tensor(categories, device = self.device), right=True).item()
 
             j = torch.arange(ages.size(0)).long().to(self.device) # used to index
 
