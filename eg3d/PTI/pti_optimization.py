@@ -14,7 +14,7 @@ import sys
 import json
 home = os.path.expanduser('~')
 sys.path.append(os.path.join(home, 'Documents/eg3d-age/eg3d/training'))
-from estimate_age import AgeEstimator
+from estimate_age import AgeEstimator, AgeEstimatorNew
 import cv2
 
 
@@ -40,7 +40,8 @@ def denormalize(z, rmin = 5, rmax = 80, tmin = -1, tmax = 1):
 def run(model_path, image_name, run_pti_inversion):
     #Load models
     paths_config.stylegan2_ada_ffhq = model_path
-    age_estimator = AgeEstimator()
+    # age_estimator = AgeEstimator()
+    age_estimator = AgeEstimatorNew(torch.device("cuda"))
 
     #Load pose parameters 
     home = os.path.expanduser('~')
@@ -56,7 +57,7 @@ def run(model_path, image_name, run_pti_inversion):
     image = cv2.imread(image_path) # load image
     image =  cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     image = torch.from_numpy(image).float()
-    estimated_age = age_estimator.estimate_age(image.permute(2,0,1)[None,:,:,:]) # so input shape is [1,3,512,512]
+    estimated_age = age_estimator.estimate_age_rgb(image[None,:,:,:]) # so input shape is [1,3,512,512]
     c.append(estimated_age.item())
     print("######################################")
     print("Estimated age is", denormalize(estimated_age).item())
