@@ -53,7 +53,7 @@ class SingleIDCoach(BaseCoach):
 
                 generated_images = self.forward(z_pivot)
                 loss, l2_loss_val, loss_lpips = self.calc_loss(generated_images, real_images_batch, image_name,
-                                                               self.G, use_ball_holder, w_pivot)
+                                                               self.G, use_ball_holder, w_pivot) # w_pivot?
                 # save progress
                 if i%(hyperparameters.max_pti_steps//6)==0:
                     save_img = (generated_images.permute(0, 2, 3, 1)* 127.5 + 128).clamp(0, 255).to(torch.uint8)
