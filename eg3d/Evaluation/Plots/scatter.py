@@ -6,7 +6,9 @@ import json
 import numpy as np
 from training.training_loop import normalize, denormalize, get_age_category
 import re 
+from matplotlib import cm
 import seaborn as sn
+from scipy.stats import pearsonr
 def add_comma(match):
     return match.group(0) + ','
 
@@ -33,6 +35,8 @@ def scatter_plot(network_folder, path):
     colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
     age_hat = df.age_hat.to_numpy()
     age_true = df.age_true.to_numpy()
+    mag = df.mag.to_numpy()
+    mag_min, mag_max = mag.min(), mag.max()
 
     if len(categories) > 1:
         ranges = len(categories) - 1
@@ -57,16 +61,23 @@ def scatter_plot(network_folder, path):
         sn.heatmap(df_cm, annot=True, annot_kws={"size": 16}) # font size
 
     else:
+        viridis = cm.get_cmap('winter', 12)
         figsize = compute_figsize(350, 250)
         age_hat = denormalize(age_hat, rmin=age_min, rmax=age_max)
         age_true = denormalize(age_true, rmin=age_min, rmax=age_max)
+        idx = normalize(mag, rmin=mag_min, rmax=mag_max, tmin=0)
+        colors = viridis(idx)
+        corr, _ = pearsonr(age_hat, age_true)
+        corr = round(corr, 4)
         plt.figure(figsize=figsize, dpi=300)
-        plt.scatter(age_true, age_hat, s=5, facecolors='none', edgecolors=colors[0])
+        plt.xticks(np.linspace(0, (age_max//10)*10, (age_max//10)+1))
+        plt.yticks(np.linspace(0, (age_max//10)*10, (age_max//10)+1))
+        plt.scatter(age_true, age_hat, s=5, c=mag, cmap="winter")
         plt.plot([age_min, age_max], [age_min, age_max], '--', label="Perfect prediction", color='black')
         plt.xlabel("True age")
         plt.ylabel("Predicted age")
-        
+        plt.colorbar(label = "MagFace magnitude")
         plt.legend()
-    plt.savefig(save_path + f"/{fig_name}" + ".png",bbox_inches='tight')
-    plt.savefig(save_path + f"/{fig_name}" + ".pgf",bbox_inches='tight')
-    print(f"Figure {fig_name} save at {save_path}")
+    plt.savefig(save_path + f"/{fig_name+str(corr)}" + ".png",bbox_inches='tight')
+    plt.savefig(save_path + f"/{fig_name+str(corr)}" + ".pgf",bbox_inches='tight')
+    print(f"Figure {fig_name+str(corr)} save at {save_path}")
