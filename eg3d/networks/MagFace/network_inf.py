@@ -9,6 +9,7 @@ import torch.nn as nn
 import torch
 
 
+
 def load_features(args):
     if args.arch == 'iresnet34':
         features = iresnet.iresnet34(
