@@ -123,7 +123,12 @@ def generate_scatter_data(G, device, seed, save_name, network_folder, truncation
 
         features = magface.get_feature_vector(img)
         mag = np.linalg.norm(features.cpu().numpy())
-        res.append([age_hat.item(), age[0], angle_p, angle_y, mag])
+        if age_loss_fn == "CAT":
+            age_true = list(age).index(1)
+            age_true = normalize(age_true, rmin=age_min, rmax=age_max)
+        elif age_loss_fn =="MSE":
+            age_true = age[0]
+        res.append([age_hat.item(), age_true, angle_p, angle_y, mag])
 
     columns = ["age_hat", "age_true", "angle_p", "angle_y", "mag"]
     df = pd.DataFrame(res, columns=columns)
