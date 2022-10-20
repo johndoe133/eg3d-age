@@ -8,7 +8,7 @@ from training.training_loop import normalize, denormalize, get_age_category
 import re 
 from matplotlib import cm
 import seaborn as sn
-from scipy.stats import pearsonr
+
 def add_comma(match):
     return match.group(0) + ','
 
