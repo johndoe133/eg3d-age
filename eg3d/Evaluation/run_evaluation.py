@@ -22,6 +22,7 @@ from Evaluation.Plots.angles_plot import angles_plot
 from Evaluation.Plots.set_age_plot import set_age_plot
 from Evaluation.Plots.id_similarity_plot import id_plot
 from Evaluation.Plots.scatter import scatter_plot
+from Evaluation.numbers import save_correlation
 
 
 @click.command()
@@ -37,6 +38,8 @@ from Evaluation.Plots.scatter import scatter_plot
 @click.option('--angles_y', help='', cls=PythonLiteralOption, required=False, default="[0.4, 0, -0.4]")
 @click.option('--run_generate_data', help='',required=False, default=True)
 @click.option('--scatter_iterations', help='Number of generated random synthetic faces for scatter plot',required=False, default=100)
+@click.option('--numbers', help='Make csv of hard number evaluations like correlation', required=False, is_flag=True, default=True)
+
 def run_evaluation(
     network_folder: str,
     network: str,
@@ -50,7 +53,7 @@ def run_evaluation(
     angles_y: list,
     run_generate_data: bool,
     scatter_iterations: int,
-
+    numbers: bool,
     ):
     np.seterr(all="ignore") # ignore numpy warnings
 
@@ -75,6 +78,8 @@ def run_evaluation(
     set_age_plot(save_name, ages)
 
     id_plot(save_name, ages_id)
+
+    save_correlation(save_name, network_folder=network_folder)
 
     
 if __name__=='__main__':
