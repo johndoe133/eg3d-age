@@ -115,7 +115,7 @@ def generate_images(
     axs1.xaxis.set_major_formatter(ticker.FuncFormatter(lambda x, pos: '{:,.0f}'.format(x/1000) + 'k'))
     axs1.set_ylim(0, age_loss_ylim*1.05)
     axs1.fill_between(x, loss_age - loss_age_std, loss_age + loss_age_std, alpha=0.4, label="std")
-    axs1.set_title("With $age_{scale}$ = " + str(age_scale))
+    axs1.set_title(r"With $\alpha_{age}$ = " + str(age_scale))
     axs1.legend(loc='upper right')
     axs1.grid(visible=True, axis="y", zorder=0)
 
@@ -129,7 +129,7 @@ def generate_images(
     axs2.set_ylim(0, id_loss_ylim*1.05)
     axs2.xaxis.set_major_formatter(ticker.FuncFormatter(lambda x, pos: '{:,.0f}'.format(x/1000) + 'k'))
     axs2.fill_between(x, loss_id - loss_id_std, loss_id + loss_id_std, alpha=0.4, label="std")
-    axs2.set_title("With $id_{scale}$ = " + str(id_scale))
+    axs2.set_title(r"With $\alpha_{ID}$ = " + str(id_scale))
     axs2.legend(loc='upper right')
     axs2.grid(visible=True, axis="y", zorder=0)
 
