@@ -38,7 +38,7 @@ class StyleGAN2Loss(Loss):
                     neural_rendering_resolution_initial=64, neural_rendering_resolution_final=None, 
                     neural_rendering_resolution_fade_kimg=0, gpc_reg_fade_kimg=1000, gpc_reg_prob=None, 
                     dual_discrimination=False, filter_mode='antialiased', age_version='v2', 
-                    age_min=0, age_max=100, id_model="ArcFace", alternate_losses=False, alternate_after=100000,
+                    age_min=0, age_max=100, id_model="FaceNet", alternate_losses=False, alternate_after=100000,
                     initial_age_training=0, age_loss_fn = "MSE"):
         super().__init__()
         self.device             = device
@@ -195,14 +195,17 @@ class StyleGAN2Loss(Loss):
 
         if loss=='MSE':
             return self.age_loss_MSE(latent_coords, new_latent_coords)
-        elif loss == 'cosine_similarity':
+        elif loss == 'cosine_similarity_mod':
             cos = self.cosine_sim(latent_coords, new_latent_coords)
             l = - torch.tensor([slope], device=self.device) * cos + torch.tensor([slope], device=self.device) # linear loss
             return l.mean()
+        elif loss =='cosine_similarity':
+            cos = self.cosine_sim(latent_coords, new_latent_coords)
+            return -cos.mean() + 1
         else:
             raise NotImplementedError
 
-    def alternate_scales(self, cur_nimg, age_scale, id_scale, inital_age_training_nimg = 200000, alternate_loop = 200000):
+    def alternate_scales(self, cur_nimg, age_scale, id_scale):
         """Help alternate between training aging and ID preservation.
 
         Args:
@@ -216,17 +219,22 @@ class StyleGAN2Loss(Loss):
         Returns:
             (age_scale, id_scale): updated scaling parameters
         """
+        
         alternate_loop = 2 * self.alternate_after
         if id_scale != 0:
-            if cur_nimg > self.initial_age_training:
-                if (cur_nimg % alternate_loop) < alternate_loop//2:
-                    # train id
-                    age_scale = 0
+            if self.alternate_losses:
+                if cur_nimg > self.initial_age_training:
+                    if (cur_nimg % alternate_loop) < alternate_loop//2:
+                        # train id
+                        age_scale = 0
+                    else:
+                        # train age
+                        id_scale = 0
                 else:
-                    # train age
                     id_scale = 0
             else:
-                id_scale = 0
+                if cur_nimg < self.initial_age_training:
+                    id_scale = 0
         return age_scale, id_scale
 
     def run_G(self, z, c, swapping_prob, neural_rendering_resolution, update_emas=False):
@@ -297,16 +305,16 @@ class StyleGAN2Loss(Loss):
                 #initialize losses
                 age_loss, id_loss = torch.Tensor([0]).to(self.device), torch.Tensor([0]).to(self.device)
 
-                age_scale, id_scale = self.alternate_scales(cur_nimg, age_scale, id_scale) if self.alternate_losses else (age_scale, id_scale)
+                age_scale, id_scale = self.alternate_scales(cur_nimg, age_scale, id_scale)
 
                 gen_img, gen_ws, c_swapped = self.run_G(gen_z, gen_c, swapping_prob=swapping_prob, neural_rendering_resolution=neural_rendering_resolution)
                 gen_logits = self.run_D(gen_img, gen_c, blur_sigma=blur_sigma)
                 if age_scale != 0:
-                    age_loss = self.run_age_loss(gen_img, gen_c, loss_fn=age_loss_fn)
+                    age_loss = self.run_age_loss(gen_img, c_swapped, loss_fn=age_loss_fn)
                 age_loss_scaled = age_loss * age_scale # age scaling
                 
                 if id_scale != 0:
-                    id_loss = self.run_id_loss(gen_img, gen_z, gen_c, c_swapped, neural_rendering_resolution, loss='cosine_similarity', margin=0.2, slope=10)
+                    id_loss = self.run_id_loss(gen_img, gen_z, gen_c, c_swapped, neural_rendering_resolution, loss='cosine_similarity_mod', margin=0.2, slope=10)
 
                 id_loss_scaled = id_loss * id_scale # id scaling
                 loss_Gmain = torch.nn.functional.softplus(-gen_logits)

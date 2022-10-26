@@ -233,7 +233,7 @@ def parse_comma_separated_list(s):
 @click.option('--age_version', help='What version of the age estimator to use', type=str, default="v2", required=False)
 @click.option('--age_min', help='Minimum age to generate random ages from', type=int, default=0, required=False)
 @click.option('--age_max', help='Maximum age to generate random ages from', type=int, default=100, required=False)
-@click.option('--id_model', help='What ID model to use. Choose between ArcFace and MagFace. ', type=str, required=False, default='ArcFace')
+@click.option('--id_model', help='What ID model to use. Choose between FaceNet and MagFace. ', type=str, required=False, default='FaceNet')
 @click.option('--alternate_losses', help='Alternate between running age_loss and ID_loss', type=bool, required=False, default=False)
 @click.option('--alternate_after', help='After how many images age_loss/id_loss should train before alternating', type=int, required=False, default=100000)
 @click.option('--initial_age_training', help='For how many images we should initally only train using age_loss', type=int, required=False, default=0)
