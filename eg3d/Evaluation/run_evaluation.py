@@ -37,7 +37,7 @@ from Evaluation.numbers import save_correlation
 @click.option('--angles_p', help='', cls=PythonLiteralOption, required=False, default="[0.4, 0, -0.4]")
 @click.option('--angles_y', help='', cls=PythonLiteralOption, required=False, default="[0.4, 0, -0.4]")
 @click.option('--run_generate_data', help='',required=False, default=True)
-@click.option('--scatter_iterations', help='Number of generated random synthetic faces for scatter plot',required=False, default=100)
+@click.option('--scatter_iterations', help='Number of generated random synthetic faces for scatter plot',required=False, default=400)
 @click.option('--numbers', help='Make csv of hard number evaluations like correlation', required=False, is_flag=True, default=True)
 
 def run_evaluation(
@@ -66,8 +66,8 @@ def run_evaluation(
     network_pkl_path = os.path.join(network_folder, network_pkl)
     save_name = f"{network_pkl_path.split('/')[2]}-{network_pkl.split('.')[0][8:]}"
 
-    print("Generating data...")
     if run_generate_data:
+        print("Generating data...")
         ages, ages_id = generate_data(save_name, network_folder, network_pkl_path, network_pkl, seed, truncation_psi, truncation_cutoff, angles_plot_iterations, age_model_name, angles_p, angles_y, scatter_iterations, id_plot_iterations)
     
     print("Creating plots...")
@@ -75,9 +75,9 @@ def run_evaluation(
 
     angles_plot(save_name, angles_p, angles_y)
 
-    set_age_plot(save_name, ages)
+    set_age_plot(save_name)
 
-    id_plot(save_name, ages_id)
+    id_plot(save_name)
 
     save_correlation(save_name, network_folder=network_folder)
 

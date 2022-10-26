@@ -5,13 +5,14 @@ import os
 from sklearn.neighbors import KernelDensity
 import numpy as np
 
-def set_age_plot(save_path, ages):
+def set_age_plot(save_path):
     plot_setup()
     save_path = os.path.join("Evaluation", "Runs", save_path)
     df = pd.read_csv(os.path.join(save_path, "age_evaluation.csv"))
     colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
     figsize = compute_figsize(426, 500)
     fig, axs = plt.subplots(3, 3, sharex=True, sharey=True, figsize = figsize, dpi=300)
+    ages = df.age.unique()
     for i, age in enumerate(ages):
         df_age = df[df.age==age]
         age_hat = df_age.age_hat.to_numpy()

@@ -148,7 +148,7 @@ def generate_id_data(
     f = open(training_option_path)
     training_option = json.load(f)
     training_id_model = training_option['loss_kwargs']['id_model']
-    id_model = "MagFace" if training_id_model=="ArcFace" else "ArcFace"
+    id_model = "MagFace" if (training_id_model=="FaceNet" or training_id_model=="ArcFace") else "FaceNet"
     cosine_sim_f = torch.nn.CosineSimilarity()
 
     age_min = training_option['age_min']

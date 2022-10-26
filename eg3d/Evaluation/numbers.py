@@ -15,7 +15,7 @@ def save_correlation(scatter_data, file_name='numbers.csv', network_folder=None)
     age_true = np.array(ages_df['age_true'])
     age_hat = np.array(ages_df['age_hat'])
     columns = ['value']
-    rows = ['correlation', 'corr_p_val', 'mae', 'num_samples', 'std', 'cs']
+    rows = ['correlation', 'corr_p_val', 'mae', 'num_samples', 'std', 'cs5', 'cs10', 'cs15']
     corr = pearsonr(age_true, age_hat)
     
     age_min = 0
@@ -32,8 +32,10 @@ def save_correlation(scatter_data, file_name='numbers.csv', network_folder=None)
     mae = np.mean(np.abs(a - b))
     std = np.std(np.abs(a-b))
     n_samples = len(age_true)
-    cs = np.sum(np.abs(a-b) > 5) / n_samples
-    data = [[corr[0]], [corr[1]], [n_samples], [mae], [std], [cs]]
+    cs5 = np.sum(np.abs(a-b) > 5) / n_samples
+    cs10 = np.sum(np.abs(a-b) > 10) / n_samples
+    cs15 = np.sum(np.abs(a-b) > 15) / n_samples
+    data = [[corr[0]], [corr[1]], [mae], [n_samples], [std], [cs5], [cs10], [cs15]]
 
     df = pd.DataFrame(data, columns=columns)
     df.index=rows

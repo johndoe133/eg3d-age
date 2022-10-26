@@ -5,7 +5,7 @@ import os
 from sklearn.neighbors import KernelDensity
 import numpy as np
 
-def id_plot(save_path, ages):
+def id_plot(save_path):
     plot_setup()
     save_path = os.path.join("Evaluation", "Runs", save_path)
     df = pd.read_csv(os.path.join(save_path, "id_evaluation.csv"))
@@ -16,6 +16,7 @@ def id_plot(save_path, ages):
     xlim = df.cosine_sim.min()
     xlim = xlim - (xlim*0.05)
     pad = 5 # in points
+    ages = df.age1.unique()
     fig, axs = plt.subplots(len(ages), len(ages), sharex=True, sharey=True, figsize = figsize, dpi=300)
     for i, age1 in enumerate(ages):
         df_age = df[df.age1==age1]

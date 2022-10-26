@@ -72,7 +72,7 @@ def scatter_plot(network_folder, path):
     plt.yticks(np.linspace(0, (age_max//10)*10, (age_max//10)+1))
     plt.scatter(age_true, age_hat, s=5, c=mag, cmap="winter")
     plt.plot([age_min, age_max], [age_min, age_max], '--', label="Perfect prediction", color='black')
-    plt.xlabel("True age")
+    plt.xlabel("Target age")
     plt.ylabel("Predicted age")
     plt.colorbar(label = "MagFace magnitude")
     plt.legend()
