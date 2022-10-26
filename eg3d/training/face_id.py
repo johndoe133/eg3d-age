@@ -7,47 +7,65 @@ import cv2
 import sys
 sys.path.append("/zhome/d7/6/127158/Documents/eg3d-age/eg3d")
 from networks.MagFace.network_inf import builder_inf
-import argparse
+from torchvision.models import resnet50
+import torchvision
+from networks.MagFace.iresnet import iresnet100, iresnet50
+from training.mtcnn import MTCNN
 
 class FaceIDLoss:
-    def __init__(self, device, model = "ArcFace", resize_img = True):
+    def __init__(self, device, model = "FaceNet", resize_img = True):
         self.model = model
-        if self.model == "ArcFace":
+        if self.model == "FaceNet":
+            self.align = MTCNN(device=device)
             self.id_model = InceptionResnetV1(pretrained='vggface2', device=device).requires_grad_(requires_grad=False).eval()
             self.resize_shape = 160 # resize to 160 x 160
         elif self.model == "MagFace":
-            # parser = argparse.ArgumentParser()
-            # parser.add_argument('--arch', default='iresnet100', type=str, help='backbone architechture')
-            # parser.add_argument('--embedding_size', default=512, type=int,help='The embedding feature size')
-            # parser.add_argument('--resume', default="./networks/MagFace/iResNet100_MagFace.pth", type=str, metavar='PATH', help='path to latest checkpoint')
-            # parser.add_argument('--cpu-mode', action='store_true', help='Use the CPU.')
-            # args = parser.parse_args()
+            # bruger https://github.com/deepinsight/insightface/blob/cdc3d4ed5de14712378f3d5a14249661e54a03ec/python-package/insightface/utils/face_align.py
+            # til alignment 
+            self.align = lambda x: x # to be done
             class args_new:
                 arch = 'iresnet100'
                 embedding_size = 512
                 resume = "./networks/MagFace/iResNet100_MagFace.pth"
                 cpu_mode = None
-
             self.id_model = builder_inf(args_new())
+            self.id_model = self.id_model.to(device).requires_grad_(requires_grad=False).eval()
+            self.resize_shape = 112 # resize to 112 x 112
+        elif self.model == "ArcFace":
+            self.align = lambda x: x # to be done
+            # https://onedrive.live.com/?authkey=%21AFZjr283nwZHqbA&cid=4A83B6B633B029CC&id=4A83B6B633B029CC%215751&parId=4A83B6B633B029CC%215585&o=OneUp
+            self.id_model = iresnet50()
+            self.id_model.load_state_dict(torch.load("./networks/arcfacers50.pth"))
             self.id_model = self.id_model.to(device).requires_grad_(requires_grad=False).eval()
             self.resize_shape = 112 # resize to 112 x 112
         self.resize_img = resize_img
 
     def get_feature_vector(self, img):
-        if self.resize_img:
-            img_resize = self.resize(img)
-        else:
-            img_resize = img # no change
-        img_RGB = self.transform_to_RGB(img_resize)
-        feature_vector = self.id_model(img_RGB)
+        img_RGB = self.transform_to_RGB(img)
+        aligned = self.align(img_RGB.permute(0,2,3,1)) #mtcnn takes shape [batch, w, h, channels]
+        feature_vector = self.id_model(aligned.permute(0,3,1,2)) # id_model takes shape [batch, channels, w, h]
         return feature_vector
 
     def get_feature_vector_test(self, img):
-        if self.resize_img:
-            img_resize = self.resize(img)
-        else:
-            img_resize = img # no change
-        feature_vector = self.id_model(img_resize)
+        """To test the function of extracting feature vectors. Usage is inputting a tensor from a image
+        loaded using cv2:
+
+        ```
+        image1 = cv2.imread(PATH TO IMAGE)
+        image1 = cv2.cvtColor(image1, cv2.COLOR_BGR2RGB)
+        img_tensor = torch.from_numpy(image1)
+        img_tensor = img_tensor.to(device)
+        v = model.get_feature_vector_test(img_tensor.float())
+        ```
+
+        Args:
+            img (tensor): 
+
+        Returns:
+            tensor: feature vector
+        """
+        aligned = self.align(img)
+        feature_vector = self.id_model(aligned.permute(2,0,1)[None,:,:,:])
         return feature_vector
 
     def transform_to_RGB(self, img):
@@ -413,23 +431,28 @@ def get_torch_home():
 
 if __name__=="__main__":
     device = torch.device("cuda")
-    model = FaceIDLoss(device, model="MagFace")
+    model = FaceIDLoss(device, model="FaceNet")
     p = '/zhome/d7/6/127158/Documents/eg3d-age/age-estimation-pytorch/in/img00000000.png'
-    p2 = '/zhome/d7/6/127158/Documents/eg3d-age/age-estimation-pytorch/in/img00000002.png'
+    p2 = '/zhome/d7/6/127158/Documents/eg3d-age/age-estimation-pytorch/in/img00000001.png'
     image1 = cv2.imread(p)
     image1 = cv2.cvtColor(image1, cv2.COLOR_BGR2RGB)
-    img_tensor = torch.from_numpy(image1)
-    img_tensor = img_tensor.to(device)
-    print(img_tensor.permute(2,0,1)[None,:,:,:].shape)
-    v1 = model.get_feature_vector_test(img_tensor.permute(2,0,1)[None,:,:,:].float())
+    img_tensor = torch.from_numpy(image1).float()
+    img_tensor = img_tensor.to(device).requires_grad_(True)
+    print(img_tensor.shape)
+    mtcnn=MTCNN(device=device)
+    # print(mtcnn(img_tensor))
+    # print(mtcnn(img_tensor[None,:,:,:]))
+    # print("Hello")
+    # print(img_tensor.permute(2,0,1)[None,:,:,:].shape)
+    v1 = model.get_feature_vector_test(img_tensor.float())
 
     image2 = cv2.imread(p2)
     image2 = cv2.cvtColor(image2, cv2.COLOR_BGR2RGB)
     img_tensor2 = torch.from_numpy(image2)
     img_tensor2 = img_tensor2.to(device)
-    v2 = model.get_feature_vector_test(img_tensor2.permute(2,0,1)[None,:,:,:].float())
+    v2 = model.get_feature_vector_test(img_tensor2.float())
 
     cosine_sim_f = torch.nn.CosineSimilarity()
-    print("SIM:", cosine_sim_f(v1, v2))
+    print("SIM:", cosine_sim_f(v1, v2).item())
     print("Norm", np.linalg.norm(v2.detach().cpu().numpy()))
 
