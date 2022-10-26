@@ -14,8 +14,9 @@ def save_correlation(scatter_data, file_name='numbers.csv', network_folder=None)
     ages_df = pd.read_csv(scatter_path)
     age_true = np.array(ages_df['age_true'])
     age_hat = np.array(ages_df['age_hat'])
+    mag = np.array(ages_df['mag'])
     columns = ['value']
-    rows = ['correlation', 'corr_p_val', 'mae', 'num_samples', 'std', 'cs']
+    rows = ['correlation', 'corr_p_val', 'mae', 'num_samples', 'std', 'cs', 'mag_corr', 'mag_p_val']
     corr = pearsonr(age_true, age_hat)
     
     age_min = 0
@@ -33,7 +34,9 @@ def save_correlation(scatter_data, file_name='numbers.csv', network_folder=None)
     std = np.std(np.abs(a-b))
     n_samples = len(age_true)
     cs = np.sum(np.abs(a-b) > 5) / n_samples
-    data = [[corr[0]], [corr[1]], [n_samples], [mae], [std], [cs]]
+    mag_corr = pearsonr(mae, mag)
+
+    data = [[corr[0]], [corr[1]], [n_samples], [mae], [std], [cs], [mag_corr[0]], [mag_corr[1]]]
 
     df = pd.DataFrame(data, columns=columns)
     df.index=rows
