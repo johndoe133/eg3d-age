@@ -53,7 +53,7 @@ class SingleIDCoach(BaseCoach):
 
                 generated_images = self.forward(z_pivot)
                 loss, l2_loss_val, loss_lpips = self.calc_loss(generated_images, real_images_batch, image_name,
-                                                               self.G, use_ball_holder, w_pivot) # w_pivot?
+                                                               self.G, use_ball_holder, z_pivot)
                 # save progress
                 if i%(hyperparameters.max_pti_steps//6)==0:
                     save_img = (generated_images.permute(0, 2, 3, 1)* 127.5 + 128).clamp(0, 255).to(torch.uint8)
@@ -72,7 +72,7 @@ class SingleIDCoach(BaseCoach):
                 use_ball_holder = global_config.training_step % hyperparameters.locality_regularization_interval == 0
 
                 if self.use_wandb and log_images_counter % global_config.image_rec_result_log_snapshot == 0:
-                    log_images_from_w([w_pivot], self.G, [image_name])
+                    log_images_from_w([w_pivot], self.G, [image_name]) # not implemented
 
                 global_config.training_step += 1
                 log_images_counter += 1
