@@ -51,7 +51,7 @@ def generate_images(
     device = torch.device('cuda')
     if network is not None:
         network_path = network
-        pkl_name="" # to be done
+        pkl_name=network.split('-')[-1][:-4]
     else:
         pkls = [string for string in os.listdir(network_folder) if '.pkl' in string]
         pkls = sorted(pkls)
@@ -133,8 +133,9 @@ def generate_images(
     draw = ImageDraw.Draw(pil_img)
     for i, age in enumerate(ages):
         draw.text(((i*512)+230,0), f"Age: {int(age)}", (0,0,0), font=font)
+
     pil_img.save(f'{network_folder}/network{pkl_name}_seed{seed:04d}.png')
-    print(f'Saved at {outdir}/seed{seed:04d}.png')
+    print(f'Saved at {outdir}/network{pkl_name}_seed{seed:04d}.png')
 
     ######## GIF #########
     font = ImageFont.truetype("FreeSerif.ttf", 40)
@@ -174,6 +175,7 @@ def generate_images(
     # imgs_gif = [tensor.cpu().numpy()[0,:,:,:] for tensor in imgs_gif]
     print("Saving gif..")
     imageio.mimsave(f'{network_folder}/network{pkl_name}_seed{seed:04d}.gif', imgs_gif)
+    print(f'Saved at {network_folder} as network{pkl_name}_seed{seed:04d}.gif')
     print("Exiting..")
     
 if __name__ == "__main__":
