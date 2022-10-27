@@ -335,9 +335,9 @@ class MTCNN(nn.Module):
                 boxes.append(box[:, :4])
                 probs.append(box[:, 4])
                 points.append(point)
-        boxes = np.array(boxes)
-        probs = np.array(probs)
-        points = np.array(points)
+        boxes = np.array(boxes, dtype=object)
+        probs = np.array(probs, dtype=object)
+        points = np.array(points, dtype=object)
 
         if (
             not isinstance(img, (list, tuple)) and 
@@ -440,9 +440,9 @@ class MTCNN(nn.Module):
             selected_points.append(point)
 
         if batch_mode:
-            selected_boxes = np.array(selected_boxes)
-            selected_probs = np.array(selected_probs)
-            selected_points = np.array(selected_points)
+            selected_boxes = np.array(selected_boxes)#, dtype=object
+            selected_probs = np.array(selected_probs) #, dtype=object)
+            selected_points = np.array(selected_points) #, dtype=object)
         else:
             selected_boxes = selected_boxes[0]
             selected_probs = selected_probs[0][0]
@@ -501,7 +501,10 @@ class MTCNN(nn.Module):
         if not batch_mode:
             faces = faces[0]
 
-        return torch.stack(faces) # changed from a list
+        if faces is not None:
+            return faces
+        else:
+            return None # no faces detected
 
 
 def fixed_image_standardization(image_tensor):
@@ -693,7 +696,7 @@ def detect_face(imgs, minsize, pnet, rnet, onet, threshold, factor, device):
         batch_boxes.append(boxes[b_i_inds].copy())
         batch_points.append(points[b_i_inds].copy())
 
-    batch_boxes, batch_points = np.array(batch_boxes), np.array(batch_points)
+    batch_boxes, batch_points = np.array(batch_boxes, dtype=object), np.array(batch_points, dtype=object)
 
     return batch_boxes, batch_points
 
