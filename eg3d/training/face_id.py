@@ -18,6 +18,7 @@ class FaceIDLoss:
     def __init__(self, device, model = "FaceNet", resize_img = True):
         self.model = model
         self.mtcnn = MTCNN(device=device)
+        self.device = device
         if self.model == "FaceNet":
             self.align = self.mtcnn
             self.id_model = InceptionResnetV1(pretrained='vggface2', device=device).requires_grad_(requires_grad=False).eval()
@@ -55,7 +56,7 @@ class FaceIDLoss:
         Returns:
             tensor: the extracted feature vector using `self.id_model` for each image in the batch
         """
-        img_RGB = img#self.transform_to_RGB(img) RET tilbage!
+        img_RGB = self.transform_to_RGB(img) 
         aligned = self.align(img_RGB.permute(0,2,3,1)) # shape is converted to [batch, w, h, channels]
         if None in aligned: # a face is not detected 
             aligned_updated = []
@@ -91,13 +92,13 @@ class FaceIDLoss:
                     [62.7299, 92.2041]
                 ], dtype=np.float32)
                 source[:,0] += 8.0
-                destination = landmark[0]
+                destination = landmark[0].astype(np.float32) # to match type between source and destination
                 tform = trans.SimilarityTransform()
                 tform.estimate(destination, source)
                 M = tform.params[0:2,:]
-                M = torch.Tensor(M).to(device)
+                M = torch.Tensor(M).to(self.device)
                 if M is None:
-                    pass
+                    print("Im in trouble")
                 else:
                     # it's warping time
                     aligned_img = warp_affine(imgs_rgb[i].permute(2,0,1)[None,:,:,:], M[None,:,:], dsize=(112,112))[0]
