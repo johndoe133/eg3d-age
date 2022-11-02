@@ -124,7 +124,8 @@ def save_image_grid(img, fname, drange, grid_size, ages=None, age_loss_fn = "MSE
 #----------------------------------------------------------------------------
 
 def denormalize(z, rmin = 0, rmax = 100, tmin = -1, tmax = 1):
-    """To go from the normalized ages ranged from -1 to 1 to actual ages.
+    """To go from the normalized ages ranged from -1 to 1 to actual ages. The inverse
+    function to `normalize`.
     The normalization of the ages are based on a range age from rmin to rmax years.
     Denormalizing only works if rmin and rmax was the same for both normlize() and denormalize().
 
@@ -145,6 +146,8 @@ def denormalize(z, rmin = 0, rmax = 100, tmin = -1, tmax = 1):
 
 def normalize(x, rmin = 0, rmax = 100, tmin = -1, tmax = 1):
     """Transforms ages ranging from rmin (e.g. 0 years) to rmax (e.g. 100 years) to be between -1 and 1.
+    Can also be used to denormalize the normalized ages if rmin and rmax are swapped with tmin and tmax used 
+    to normalize. 
 
     Args:
         x: input age
