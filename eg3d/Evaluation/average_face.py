@@ -4,7 +4,7 @@ from PIL import Image, ImageDraw, ImageFont
 import os
 from tqdm import tqdm
 import json
-
+import imageio
 
 def average_face(
     G, save_name, device, truncation_psi, truncation_cutoff, get_camera_parameters, get_conditioning_parameter, image_grid, network_folder
@@ -77,6 +77,43 @@ def average_face(
     image_name = f"avg_face_{images_age_min}_{images_age_max}.png"
     grid.save(os.path.join(save_path, image_name))
     print(f"Saves {image_name} at {save_path}")
+
+    # Linear interpolation
+    print("Generating z interpolation")
+    age1 = age_min
+    age2 = age_max
+    z1 = torch.from_numpy(np.random.randn(1, G.z_dim)).to(device)
+    z2 = torch.from_numpy(np.random.randn(1, G.z_dim)).to(device)
+    c_camera = get_camera_parameters(age, G, device, angle_y, angle_p, age_loss_fn, age_min, age_max)
+    images = []
+    for weight in np.linspace(0,1,50):
+        z = torch.lerp(z1,z2, weight)
+        age = age1 + age2 * weight
+        c = get_conditioning_parameter(age, G, device, age_loss_fn, age_min, age_max)
+        ws = G.mapping(z, c, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff)
+        generated_image =  G.synthesis(ws, c_camera)['image']
+        img = (generated_image * 127.5 + 128).clamp(0, 255).to(torch.uint8)
+        pil_img = Image.fromarray(img.permute(0,2,3,1)[0].cpu().numpy(), 'RGB')
+        images.append(np.array(pil_img))
+    imageio.mimsave(os.path.join(save_path, "z_interpolation.gif"), images)
+
+    print("Generating w interpolation")
+    c1 = get_conditioning_parameter(age1, G, device, age_loss_fn, age_min, age_max)
+    c2 = get_conditioning_parameter(age2, G, device, age_loss_fn, age_min, age_max)
+    ws1 = G.mapping(z, c1, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff)
+    ws2 = G.mapping(z, c2, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff)
+    images = []
+    for weight in np.linspace(0,1,50):
+        ws = torch.lerp(ws1, ws2, weight)
+        generated_image =  G.synthesis(ws, c_camera)['image']
+        img = (generated_image * 127.5 + 128).clamp(0, 255).to(torch.uint8)
+        pil_img = Image.fromarray(img.permute(0,2,3,1)[0].cpu().numpy(), 'RGB')
+        images.append(np.array(pil_img))
+    imageio.mimsave(os.path.join(save_path, "w_interpolation.gif"), images)
+        
+    print("Done interpolating...")
+    
+
 
 
 if __name__ == "__main__":
