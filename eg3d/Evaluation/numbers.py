@@ -3,10 +3,7 @@ import pandas as pd
 import os
 import numpy as np
 import json
-
-def normalize_ages(age, rmin = 5, rmax = 80, tmin = -1, tmax = 1):
-    z = ((age - rmin) / (rmax - rmin)) * (tmax - tmin) + tmin
-    return z
+from training.training_loop import denormalize, normalize
 
 def save_correlation(scatter_data, file_name='numbers.csv', network_folder=None):
     root = os.path.join('Evaluation', 'Runs', scatter_data)
@@ -30,19 +27,20 @@ def save_correlation(scatter_data, file_name='numbers.csv', network_folder=None)
         age_loss_fn = training_option['age_loss_fn']
         age_min = training_option['age_min']
         age_max = training_option['age_max']
-    a = normalize_ages(age_true, rmin=-1, rmax=1, tmin=age_min, tmax=age_max)
-    b = normalize_ages(age_hat, rmin=-1, rmax=1, tmin=age_min, tmax=age_max)
-    mae = np.mean(np.abs(a - b))
-    std = np.std(np.abs(a-b))
+    age_true_unnormalized = normalize(age_true, rmin=-1, rmax=1, tmin=age_min, tmax=age_max)
+    age_hat_unnormalized = normalize(age_hat, rmin=-1, rmax=1, tmin=age_min, tmax=age_max)
+    error = np.abs(age_true_unnormalized - age_hat_unnormalized)
+    mae = np.mean(error)
+    std = np.std(error)
     n_samples = len(age_true)
 
-    cs5 = np.sum(np.abs(a-b) > 5) / n_samples
-    cs10 = np.sum(np.abs(a-b) > 10) / n_samples
-    cs15 = np.sum(np.abs(a-b) > 15) / n_samples
+    cs5 = np.sum(error > 5) / n_samples
+    cs10 = np.sum(error > 10) / n_samples
+    cs15 = np.sum(error > 15) / n_samples
 
-    mag_corr = pearsonr(mae, mag)
+    error_mag_corr = pearsonr(error, mag)
 
-    data = [[corr[0]], [corr[1]], [n_samples], [mae], [std],  [cs5], [cs10], [cs15], [mag_corr[0]], [mag_corr[1]]]
+    data = [[corr[0]], [corr[1]], [mae],[n_samples],  [std],  [cs5], [cs10], [cs15], [error_mag_corr[0]], [error_mag_corr[1]]]
 
 
     df = pd.DataFrame(data, columns=columns)
