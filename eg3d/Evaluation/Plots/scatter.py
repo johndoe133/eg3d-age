@@ -79,3 +79,14 @@ def scatter_plot(network_folder, path):
     plt.savefig(save_path + f"/{fig_name}" + ".png",bbox_inches='tight')
     plt.savefig(save_path + f"/{fig_name}" + ".pgf",bbox_inches='tight')
     print(f"Figure {fig_name} save at {save_path}")
+
+    plt.figure(figsize=figsize, dpi=300)
+    error = np.abs(age_hat - age_true)
+    plt.scatter(error, mag, facecolor='none', edgecolors='steelblue', s=10)
+    fig_name = "error_mag"
+    plt.xlabel("Absolute age error")
+    plt.ylabel("MagFace magnitude")
+    plt.savefig(save_path + f"/{fig_name}" + ".png",bbox_inches='tight')
+    plt.savefig(save_path + f"/{fig_name}" + ".pgf",bbox_inches='tight')
+
+
