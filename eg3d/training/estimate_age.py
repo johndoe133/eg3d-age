@@ -104,7 +104,7 @@ class AgeEstimatorNew():
         outputs = F.softmax(self.age_model(crops_BGR), dim=-1)
         predicted_ages = (outputs * self.ages).sum(axis=-1)
         if normalize:
-            return self.normalize_ages(predicted_ages)
+            return self.normalize_ages(predicted_ages, rmin=self.age_min, rmax=self.age_max)
         else:
             return predicted_ages
 
