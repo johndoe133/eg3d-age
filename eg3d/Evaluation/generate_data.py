@@ -66,14 +66,15 @@ def generate_data(
 
     np.random.seed(seed) # setting the seed to get consistent results
     
-    # if generate_average_face:
-    #     average_face(G, save_name, device, truncation_psi, truncation_cutoff, get_camera_parameters, get_conditioning_parameter, image_grid, network_folder)
-    # print("Generating age data...")
-    # ages = generate_angles_data(G, age_model_name, device, angles_p, angles_y, angles_plot_iterations, save_name, truncation_cutoff, truncation_psi, network_folder)
-    # print("Generating id data...")
-    # ages_id = generate_id_data(G, device, id_plot_iterations, save_name, truncation_cutoff, truncation_psi, network_folder)
-    # print("Generating scatter plot data...")
-    # generate_scatter_data(G, device, seed, save_name, network_folder, truncation_cutoff, truncation_psi, age_model_name, scatter_iterations)
+    if generate_average_face:
+        print("Making average faces of different ages...")
+        average_face(G, save_name, device, truncation_psi, truncation_cutoff, get_camera_parameters, get_conditioning_parameter, image_grid, network_folder)
+    print("Generating age data...")
+    ages = generate_angles_data(G, age_model_name, device, angles_p, angles_y, angles_plot_iterations, save_name, truncation_cutoff, truncation_psi, network_folder)
+    print("Generating id data...")
+    ages_id = generate_id_data(G, device, id_plot_iterations, save_name, truncation_cutoff, truncation_psi, network_folder)
+    print("Generating scatter plot data...")
+    generate_scatter_data(G, device, seed, save_name, network_folder, truncation_cutoff, truncation_psi, age_model_name, scatter_iterations)
     if make_truncation_data:
         print("Generating truncation data...")
         generate_truncation_data(G, device, seed, save_name, network_folder)
@@ -91,6 +92,7 @@ def generate_scatter_data(G, device, seed, save_name, network_folder, truncation
     training_option_path = os.path.join(network_folder, "training_options.json")
     f = open(training_option_path)
     training_option = json.load(f)
+    f.close()
     age_loss_fn = training_option['age_loss_fn']
     age_min = training_option['age_min']
     age_max = training_option['age_max']
@@ -159,6 +161,7 @@ def generate_id_data(
     training_option_path = os.path.join(network_folder, "training_options.json")
     f = open(training_option_path)
     training_option = json.load(f)
+    f.close()
     training_id_model = training_option['loss_kwargs']['id_model']
     id_model = "MagFace" if (training_id_model=="FaceNet" or training_id_model=="ArcFace") else "FaceNet"
     cosine_sim_f = torch.nn.CosineSimilarity()
@@ -223,6 +226,7 @@ def generate_angles_data(G, age_model_name, device, angles_p, angles_y, angles_p
     training_option_path = os.path.join(network_folder, "training_options.json")
     f = open(training_option_path)
     training_option = json.load(f)
+    f.close()
     age_min = training_option['age_min']
     age_max = training_option['age_max']
     age_loss_fn = training_option['age_loss_fn']
@@ -272,6 +276,7 @@ def generate_image(G, seed, device, path, save_name):
     training_option_path = os.path.join(path, "training_options.json")
     f = open(training_option_path)
     training_option = json.load(f)
+    f.close()
     age_loss_fn = training_option['age_loss_fn']
     age_min = training_option['age_min']
     age_max = training_option['age_max']
@@ -390,6 +395,7 @@ def generate_truncation_data(G, device, seed, save_name, network_folder):
     training_option_path = os.path.join(network_folder, "training_options.json")
     f = open(training_option_path)
     training_option = json.load(f)
+    f.close()
     age_min = training_option['age_min']
     age_max = training_option['age_max']
     age_loss_fn = training_option['age_loss_fn']
@@ -441,6 +447,7 @@ def save_image_folder(save_name, network_folder, G, device, truncation_cutoff, t
     training_option_path = os.path.join(network_folder, "training_options.json")
     f = open(training_option_path)
     training_option = json.load(f)
+    f.close()
     age_loss_fn = training_option['age_loss_fn']
     age_min = training_option['age_min']
     age_max = training_option['age_max']
