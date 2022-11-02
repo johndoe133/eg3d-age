@@ -17,12 +17,13 @@ from training.coral import Coral
 from plot_training_results import plot_setup, compute_figsize
 from train import PythonLiteralOption
 
-from Evaluation.generate_data import generate_data
+from Evaluation.generate_data import generate_data, save_image_folder
 from Evaluation.Plots.angles_plot import angles_plot
 from Evaluation.Plots.set_age_plot import set_age_plot
 from Evaluation.Plots.id_similarity_plot import id_plot
 from Evaluation.Plots.scatter import scatter_plot
 from Evaluation.numbers import save_correlation
+from Evaluation.Plots.truncation_plot import truncation_plot
 
 
 @click.command()
@@ -39,7 +40,9 @@ from Evaluation.numbers import save_correlation
 @click.option('--run_generate_data', help='',required=False, default=True)
 @click.option('--scatter_iterations', help='Number of generated random synthetic faces for scatter plot',required=False, default=400)
 @click.option('--numbers', help='Make csv of hard number evaluations like correlation', required=False, is_flag=True, default=True)
-
+@click.option('--generate_image_folder', help="Make image folder of random images", required=False, default=False)
+@click.option('--generate_average_face', help="", required=False, default=True)
+@click.option('--make_truncation_data', help="", required=False, default=True)
 def run_evaluation(
     network_folder: str,
     network: str,
@@ -54,6 +57,9 @@ def run_evaluation(
     run_generate_data: bool,
     scatter_iterations: int,
     numbers: bool,
+    generate_image_folder: bool,
+    generate_average_face: bool,
+    make_truncation_data: bool,
     ):
     np.seterr(all="ignore") # ignore numpy warnings
 
@@ -66,9 +72,15 @@ def run_evaluation(
     network_pkl_path = os.path.join(network_folder, network_pkl)
     save_name = f"{network_pkl_path.split('/')[2]}-{network_pkl.split('.')[0][8:]}"
 
+
     if run_generate_data:
         print("Generating data...")
-        ages, ages_id = generate_data(save_name, network_folder, network_pkl_path, network_pkl, seed, truncation_psi, truncation_cutoff, angles_plot_iterations, age_model_name, angles_p, angles_y, scatter_iterations, id_plot_iterations)
+        generate_data(
+            save_name, network_folder, network_pkl_path, 
+            network_pkl, seed, truncation_psi, truncation_cutoff, 
+            angles_plot_iterations, age_model_name, angles_p, angles_y, 
+            scatter_iterations, id_plot_iterations, generate_image_folder, 
+            generate_average_face, make_truncation_data)
     
     print("Creating plots...")
     scatter_plot(network_folder, save_name)
@@ -81,6 +93,9 @@ def run_evaluation(
 
     save_correlation(save_name, network_folder=network_folder)
 
+    truncation_plot(network_folder, save_name)
+    
+    print(f"Evaluation completed.\nSee results in Evaluation/Runs/{save_name}")
     
 if __name__=='__main__':
     run_evaluation()
