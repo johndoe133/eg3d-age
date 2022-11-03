@@ -15,3 +15,4 @@ def combine_runs(comb_dir, file_name):
     with open(os.path.join(comb_dir, file_name), 'w') as f:
         [f.write(line) for line in combined_json]
     print(f'Wrote combined {file_name} file to', os.path.join(comb_dir, file_name))
+    f.close()
