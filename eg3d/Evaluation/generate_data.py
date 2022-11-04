@@ -254,7 +254,7 @@ def generate_angles_data(G, age_model_name, device, angles_p, angles_y, angles_p
                 generated_image =  G.synthesis(ws, c_camera)['image']
                 age_hat, logits = age_model.estimate_age(generated_image)
                 if age_model_name in ["v1", "v2"]:
-                    age_hat = denormalize(age_hat)
+                    age_hat = denormalize(age_hat, rmin=age_min, rmax=age_max)
                 age_hat = age_hat.item()
                 mae = np.abs(age - age_hat)
                 error = age-age_hat
