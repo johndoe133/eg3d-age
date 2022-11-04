@@ -60,3 +60,34 @@ def id_plot(save_path):
     fig_name = "id.png"
     plt.savefig(save_path + f"/{fig_name}")
     print(f"Figure {fig_name} save at {save_path}")  
+
+    fig, axs = plt.subplots(len(ages), 1, sharey=False, sharex=True, figsize = figsize, dpi=300)
+    df_grouped = df.groupby(["age1","age2"]).mean().reset_index()
+    df_grouped_std = df.groupby(["age1","age2"]).std().reset_index()
+    for i, age1 in enumerate(ages):
+        cosine_sim = df_grouped[df_grouped.age1 == age1].cosine_sim.to_list()
+        std = df_grouped_std[df_grouped_std.age1 == age1].cosine_sim.to_list()
+        x = df_grouped[df_grouped.age1 == age1].age2.to_list()
+
+        x.insert(i, age1)
+        cosine_sim.insert(i,1)
+        std.insert(i,0)
+
+        x, cosine_sim, std = np.array(x), np.array(cosine_sim), np.array(std)
+
+        axs[i].scatter(x, cosine_sim, s=15, zorder=20)
+        axs[i].plot(x, cosine_sim, color="black", alpha=0.6, zorder=1)
+        axs[i].fill_between(x, cosine_sim - std, cosine_sim + std, alpha=0.4, label="std", color="steelblue")
+        
+        axs[i].set_ylim(0,1.1)
+        axs[i].set_ylabel(r"Average $S_C$")
+        if axs[i].get_subplotspec().is_last_row():
+            axs[i].set_xlabel("Age")
+        axs[i].legend()
+        axs[i].set_xticks(ages) 
+        axs[i].set_xticklabels(ages)
+        axs[i].set_title(f"Considered age: {ages[i]}")
+    fig.tight_layout()
+    fig_name = "id2.png"
+    plt.savefig(save_path + f"/{fig_name}")
+    print(f"Figure {fig_name} save at {save_path}")  
