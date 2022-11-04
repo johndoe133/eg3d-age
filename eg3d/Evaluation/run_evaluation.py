@@ -71,7 +71,7 @@ def run_evaluation(
         pkls = sorted(pkls)
         network_pkl = pkls[-1]
     network_pkl_path = os.path.join(network_folder, network_pkl)
-    save_name = f"{network_pkl_path.split('/')[2]}-{network_pkl.split('.')[0][8:]}"
+    save_name = f"{network_pkl_path.split('/')[2]}-{network_pkl.split('.')[0][8:]}-trunc-{truncation_psi}"
 
 
     if run_generate_data:
