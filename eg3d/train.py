@@ -448,7 +448,10 @@ def main(**kwargs):
         desc += f'-{opts.desc}'
 
     # Launch.
-    launch_training(c=c, desc=desc, outdir=opts.outdir, dry_run=opts.dry_run, resume=c.resume_pkl)
+    if opts.resume:
+        launch_training(c=c, desc=desc, outdir=opts.outdir, dry_run=opts.dry_run, resume=c.resume_pkl)
+    else:
+        launch_training(c=c, desc=desc, outdir=opts.outdir, dry_run=opts.dry_run)
 
 #----------------------------------------------------------------------------
 
