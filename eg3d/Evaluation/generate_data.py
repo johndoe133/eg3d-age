@@ -112,28 +112,51 @@ def generate_scatter_data(G, device, seed, save_name, network_folder, truncation
     if age_loss_fn == "CAT":
         categories = 101
         ages = np.zeros((iterations, categories))
+        ages_2 = np.zeros((iterations, categories))
         for i, _ in enumerate(ages):
             age = np.random.randint(age_min, age_max+1)
             ages[i][age] = 1
+            age_2 = np.random.randint(age_min, age_max+1)
+            ages_2[i][age] = 1
     elif age_loss_fn == "MSE":
         ages = np.random.RandomState(seed+2).uniform(-1, 1, size=(iterations, 1))
+        ages_2 = np.random.RandomState(seed+3).uniform(-1, 1, size=(iterations, 1))
 
     fov_deg = 18.837
     intrinsics = FOV_to_intrinsics(fov_deg, device=device)
     cam_pivot = torch.tensor(G.rendering_kwargs.get('avg_camera_pivot', [0,0,0]), device=device)
     cam_radius = G.rendering_kwargs.get('avg_camera_radius', 2.7)
     res = []
-    for zi, age, angle_p, angle_y in tqdm(zip(z, ages, angles_p, angles_y), total=iterations):
+
+    training_id_model = training_option['loss_kwargs']['id_model']
+    id_model_name = "MagFace" if (training_id_model=="FaceNet" or training_id_model=="ArcFace") else "FaceNet"
+    id_model = FaceIDLoss(device, model=id_model_name)
+        
+    cosine_sim_f = torch.nn.CosineSimilarity()
+    for zi, age, age_2, angle_p, angle_y in tqdm(zip(z, ages, ages_2, angles_p, angles_y), total=iterations):
         cam2world_pose = LookAtPoseSampler.sample(np.pi/2 + angle_y, np.pi/2 + angle_p, cam_pivot, radius=cam_radius, device=device)
         conditioning_cam2world_pose = LookAtPoseSampler.sample(np.pi/2, np.pi/2, cam_pivot, radius=cam_radius, device=device)
         camera_params = torch.cat([cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)
         conditioning_params = torch.cat([conditioning_cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)    
         c = torch.cat((conditioning_params, torch.tensor([age], device=device)), 1)
         c_params = torch.cat((camera_params, torch.tensor([age], device=device)), 1).float()
-
         ws = G.mapping(zi[None,:], c, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff)
         img = G.synthesis(ws, c_params)['image']
         age_hat, logits = age_model.estimate_age(img)
+
+
+        # same person, diff age
+        c_params_2 = torch.cat((camera_params, torch.tensor([age_2], device=device)), 1).float()
+        c_2 = torch.cat((conditioning_params, torch.tensor([age_2], device=device)), 1)
+        ws_2 = G.mapping(zi[None,:], c_2, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff)
+        img_2 = G.synthesis(ws_2, c_params_2)['image']
+        age_hat_2, logits_2 = age_model.estimate_age(img_2)
+        
+        v1 = id_model.get_feature_vector(img)
+        v2 = id_model.get_feature_vector(img_2)
+        cos_sim = cosine_sim_f(v1,v2)
+
+        age_diff = abs(normalize(age, rmin=-1, rmax=1, tmin=age_min, tmax=age_max) - normalize(age_2, rmin=-1, rmax=1, tmin=age_min, tmax=age_max))
 
         features = magface.get_feature_vector(img)
         mag = np.linalg.norm(features.cpu().numpy())
@@ -142,9 +165,9 @@ def generate_scatter_data(G, device, seed, save_name, network_folder, truncation
             age_true = normalize(age_true, rmin=age_min, rmax=age_max)
         elif age_loss_fn =="MSE":
             age_true = age[0]
-        res.append([age_hat.item(), age_true, angle_p, angle_y, mag])
+        res.append([age_hat.item(), age_true, angle_p, angle_y, mag, cos_sim.item(), age_diff[0]])
 
-    columns = ["age_hat", "age_true", "angle_p", "angle_y", "mag"]
+    columns = ["age_hat", "age_true", "angle_p", "angle_y", "mag", "cos_sim", "age_diff"]
     df = pd.DataFrame(res, columns=columns)
     # Save as csv file
     save_dir = os.path.join("Evaluation","Runs", save_name)

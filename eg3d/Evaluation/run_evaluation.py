@@ -22,6 +22,7 @@ from Evaluation.Plots.angles_plot import angles_plot
 from Evaluation.Plots.set_age_plot import set_age_plot
 from Evaluation.Plots.id_similarity_plot import id_plot
 from Evaluation.Plots.scatter import scatter_plot
+from Evaluation.Plots.id_vs_age_plot import plot_id_vs_age_scatter
 from Evaluation.numbers import save_correlation
 from Evaluation.Plots.truncation_plot import truncation_plot
 
@@ -84,6 +85,8 @@ def run_evaluation(
     
     print("Creating plots...")
     scatter_plot(network_folder, save_name)
+    
+    plot_id_vs_age_scatter(network_folder, save_name)
 
     angles_plot(save_name, angles_p, angles_y)
 
