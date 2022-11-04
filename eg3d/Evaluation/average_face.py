@@ -5,6 +5,7 @@ import os
 from tqdm import tqdm
 import json
 import imageio
+import torch.nn.functional as F
 
 def average_face(
     G, save_name, device, truncation_psi, truncation_cutoff, get_camera_parameters, get_conditioning_parameter, image_grid, network_folder
@@ -48,7 +49,7 @@ def average_face(
     age_loss_fn = "MSE"
     angle_y, angle_p = 0,0
 
-    images = []
+    images_gif = []
 
     # Generate age in W space for each age
     for age in tqdm(ages):
@@ -71,50 +72,62 @@ def average_face(
         text_added = ImageDraw.Draw(pil_img)
 
         text_added.text((0,420), f"Age: {age}", font=font, fill=text_color)
-        images.append(pil_img)
+        images_gif.append(pil_img)
 
-    grid = image_grid(images, rows=3, cols = 4)
+    grid = image_grid(images_gif, rows=3, cols = 4)
     image_name = f"avg_face_{images_age_min}_{images_age_max}.png"
     grid.save(os.path.join(save_path, image_name))
     print(f"Saves {image_name} at {save_path}")
 
     # Linear interpolation
-    print("Generating z interpolation")
+    rows = 5
+    print("Generating z interpolation...")
     age1 = age_min
     age2 = age_max
     z1 = torch.from_numpy(np.random.randn(1, G.z_dim)).to(device)
     z2 = torch.from_numpy(np.random.randn(1, G.z_dim)).to(device)
     c_camera = get_camera_parameters(age, G, device, angle_y, angle_p, age_loss_fn, age_min, age_max)
+    images_gif = []
     images = []
-    for weight in np.linspace(0,1,50):
-        z = torch.lerp(z1,z2, weight)
+    for weight in np.linspace(0, 1, rows**2):
+        z = torch.lerp(z1, z2, weight)
         age = age1 + age2 * weight
         c = get_conditioning_parameter(age, G, device, age_loss_fn, age_min, age_max)
         ws = G.mapping(z, c, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff)
         generated_image =  G.synthesis(ws, c_camera)['image']
-        img = (generated_image * 127.5 + 128).clamp(0, 255).to(torch.uint8)
+        img = (generated_image * 127.5 + 128).clamp(0, 255)
+        img = F.interpolate(img.float(), [200,200],  mode='bilinear', align_corners=True).to(torch.uint8)
         pil_img = Image.fromarray(img.permute(0,2,3,1)[0].cpu().numpy(), 'RGB')
-        images.append(np.array(pil_img))
-    imageio.mimsave(os.path.join(save_path, "z_interpolation.gif"), images)
+        images.append(pil_img)
+        images_gif.append(np.array(pil_img))
+    save = os.path.join(save_path, "z_interpolation")
+    imageio.mimsave(save + ".gif", images_gif)
+    grid = image_grid(images, rows = rows, cols = rows)
+    grid.save(save + ".png")
 
-    print("Generating w interpolation")
+    print("Generating w interpolation...")
     c1 = get_conditioning_parameter(age1, G, device, age_loss_fn, age_min, age_max)
     c2 = get_conditioning_parameter(age2, G, device, age_loss_fn, age_min, age_max)
     ws1 = G.mapping(z, c1, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff)
     ws2 = G.mapping(z, c2, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff)
+    images_gif = []
     images = []
-    for weight in np.linspace(0,1,50):
+    for weight in np.linspace(0,1, rows**2):
         ws = torch.lerp(ws1, ws2, weight)
         generated_image =  G.synthesis(ws, c_camera)['image']
-        img = (generated_image * 127.5 + 128).clamp(0, 255).to(torch.uint8)
+        img = (generated_image * 127.5 + 128).clamp(0, 255)
+        img = F.interpolate(img.float(), [200,200],  mode='bilinear', align_corners=True).to(torch.uint8)
         pil_img = Image.fromarray(img.permute(0,2,3,1)[0].cpu().numpy(), 'RGB')
-        images.append(np.array(pil_img))
-    imageio.mimsave(os.path.join(save_path, "w_interpolation.gif"), images)
+        images.append(pil_img)
+        images_gif.append(np.array(pil_img))
+
+    save = os.path.join(save_path, "w_interpolation")
+    imageio.mimsave(save + ".gif", images_gif)
+    grid = image_grid(images, rows = rows, cols = rows)
+    grid.save(save + ".png")
         
     print("Done interpolating...")
     
-
-
 
 if __name__ == "__main__":
     average_face()
