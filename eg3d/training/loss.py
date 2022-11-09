@@ -22,7 +22,9 @@ import time
 from training.face_id import FaceIDLoss
 import random
 from training.training_loop import normalize
-
+from camera_utils import LookAtPoseSampler, FOV_to_intrinsics
+from numpy.random import uniform
+from itertools import combinations
 #----------------------------------------------------------------------------
 
 class Loss:
@@ -39,7 +41,7 @@ class StyleGAN2Loss(Loss):
                     neural_rendering_resolution_fade_kimg=0, gpc_reg_fade_kimg=1000, gpc_reg_prob=None, 
                     dual_discrimination=False, filter_mode='antialiased', age_version='v2', 
                     age_min=0, age_max=100, id_model="FaceNet", alternate_losses=False, alternate_after=100000,
-                    initial_age_training=0, age_loss_fn = "MSE"):
+                    initial_age_training=0, age_loss_fn = "MSE", crop_before_estimate_ages=False):
         super().__init__()
         self.device             = device
         self.G                  = G
@@ -77,14 +79,27 @@ class StyleGAN2Loss(Loss):
         if age_version == 'v1':
             self.age_model = AgeEstimator(age_min=self.age_min, age_max=self.age_max)
         elif age_version == "v2":
-            self.age_model = AgeEstimatorNew(self.device, age_min=self.age_min, age_max=self.age_max)
+            self.age_model = AgeEstimatorNew(self.device, age_min=self.age_min, age_max=self.age_max, crop=crop_before_estimate_ages)
         self.alternate_losses = alternate_losses
         self.alternate_after = alternate_after
         self.initial_age_training = initial_age_training
+        self.frontal_camera_params = self.get_frontal_camera_params()
 
 
         assert self.gpc_reg_prob is None or (0 <= self.gpc_reg_prob <= 1)
 
+    def get_frontal_camera_params(self):
+        fov_deg = 18.837
+        intrinsics = FOV_to_intrinsics(fov_deg, device=self.device)
+        cam_pivot = torch.tensor(self.G.rendering_kwargs.get('avg_camera_pivot', [0,0,0]), device=self.device)
+        cam_radius = self.G.rendering_kwargs.get('avg_camera_radius', 2.7)
+        angle_y, angle_p = 0,0 # straight angle
+        cam2world_pose = LookAtPoseSampler.sample(np.pi/2 + angle_y, np.pi/2 + angle_p, cam_pivot, radius=cam_radius, device=self.device)
+        camera_params = torch.cat([cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)
+        # random age is appended to camera params to match dimension
+        # the age does not affect the output in the synthesis step, see triplane.py line 51
+        c_params = torch.cat((camera_params, torch.tensor([[0]], device=self.device)), 1)
+        return c_params
 
     def run_age_loss(self, imgs, c, loss_fn="MSE"):
         """Returns the age loss given a series of generated images and the age the synthetic images
@@ -137,6 +152,44 @@ class StyleGAN2Loss(Loss):
 
         return total_loss
 
+    def compute_weight(self, delta_age):
+        return 0.25 * torch.cos(torch.pi * delta_age) + 0.75
+
+    def run_id_loss3(self, z, c_swapped, neural_rendering_resolution):
+        new_c_swapped = c_swapped.clone() # used for the G.mapping step so the "scene identity" is preserved
+        id_loss = torch.tensor([], device=self.device)
+        idx = np.random.randint(0, len(z))
+        zi = z[idx]
+        
+        random_ages = [
+            uniform(-1, -0.5),
+            uniform(-0.5,0),
+            uniform(0, 0.5),
+            uniform(0.5, 1)
+        ]
+        age_ranges = len(random_ages)
+        new_c = torch.repeat_interleave(c_swapped[idx][None,:], age_ranges, axis=0)
+        new_c[:,-1] = torch.tensor(random_ages)
+        z_identical = torch.repeat_interleave(zi[None,:], age_ranges, axis=0)
+        latent_coords = torch.tensor([], device=self.device)
+        
+        ws = self.G.mapping(z_identical, new_c)
+        c_params = torch.repeat_interleave(self.frontal_camera_params, age_ranges, axis=0)
+        gen_img = self.G.synthesis(ws, c_params, neural_rendering_resolution=neural_rendering_resolution, update_emas=False)
+        new_images = gen_img['image']
+        f = self.id_model.get_feature_vector(new_images)
+        
+        for k, l in list(combinations(list(range(age_ranges)), r=2)):
+            loss = 1 - self.cosine_sim(f[k][None,:], f[l][None,:])
+            weight = self.compute_weight(new_c[l, - 1] - new_c[k,-1])
+            weighted_loss = loss*weight
+            id_loss = torch.cat((id_loss, weighted_loss),0)
+        return id_loss.mean()
+
+
+        
+
+
     def run_id_loss(self, imgs, z, c, c_swapped, neural_rendering_resolution, margin=0.2, loss='MSE', update_emas=False, slope=10):
         """Returns the identity loss of a subject by comparing the given images to the 
         images aged and young-ified. 
@@ -162,7 +215,7 @@ class StyleGAN2Loss(Loss):
 
         else: # ages are categorized
             ages = c[:,25:].clone() # categories size [batch_size, len(categories) - 1]
-            categories=list(range(101)) 
+            categories = list(range(101)) 
             left = torch.bucketize(self.age_min, torch.tensor(categories, device = self.device), right=False).item()
             right = torch.bucketize(self.age_max, torch.tensor(categories, device = self.device), right=True).item()
 
@@ -314,7 +367,7 @@ class StyleGAN2Loss(Loss):
                 age_loss_scaled = age_loss * age_scale # age scaling
                 
                 if id_scale != 0:
-                    id_loss = self.run_id_loss(gen_img, gen_z, gen_c, c_swapped, neural_rendering_resolution, loss='cosine_similarity_mod', margin=0.2, slope=10)
+                    id_loss = self.run_id_loss3(gen_z, c_swapped, neural_rendering_resolution)
 
                 id_loss_scaled = id_loss * id_scale # id scaling
                 loss_Gmain = torch.nn.functional.softplus(-gen_logits)
