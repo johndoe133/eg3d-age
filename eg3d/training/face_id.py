@@ -15,9 +15,12 @@ from skimage import transform as trans
 from kornia.geometry import warp_affine
 
 class FaceIDLoss:
+    """Module used for identity preservation. The available models are FaceNet and MagFace.
+    
+    """
     def __init__(self, device, model = "FaceNet", resize_img = True):
         self.model = model
-        self.mtcnn = MTCNN(device=device)
+        self.mtcnn = MTCNN(device=device, selection_method="probability", thresholds=[0.2, 0.2, 0.2])
         self.device = device
         if self.model == "FaceNet":
             self.align = self.mtcnn
@@ -477,7 +480,7 @@ def load_weights(mdl, name):
     else:
         raise ValueError('Pretrained models only exist for "vggface2" and "casia-webface"')
 
-    model_dir = r"./networks/face_id_model.pt"
+    model_dir = r"./networks/face_id_model.pt" # from link https://github.com/timesler/facenet-pytorch/releases/download/v2.2.9/20180402-114759-vggface2.pt
 
     if not os.path.exists(model_dir):
         print('path doesn\'t exist')
