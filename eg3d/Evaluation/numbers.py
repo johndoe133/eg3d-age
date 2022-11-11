@@ -12,7 +12,7 @@ def save_correlation(scatter_data, file_name='numbers.csv', network_folder=None)
     age_true = np.array(ages_df['age_true'])
     age_hat = np.array(ages_df['age_hat'])
     mag = np.array(ages_df['mag'])
-    columns = ['value']
+    columns = ['type', 'value']
 
     rows = ['correlation', 'corr_p_val', 'mae', 'num_samples', 'std', 'cs5', 'cs10', 'cs15', 'mag_corr', 'mag_p_val']
 
