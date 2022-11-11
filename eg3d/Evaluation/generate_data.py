@@ -52,6 +52,7 @@ def generate_data(
     generate_image_folder: bool,
     generate_average_face: bool,
     make_truncation_data: bool,
+    make_id_vs_age: bool,
 
     ):
     ## LOADING NETWORK ##
@@ -74,7 +75,7 @@ def generate_data(
     print("Generating id data...")
     ages_id = generate_id_data(G, device, id_plot_iterations, save_name, truncation_cutoff, truncation_psi, network_folder)
     print("Generating scatter plot data...")
-    generate_scatter_data(G, device, seed, save_name, network_folder, truncation_cutoff, truncation_psi, age_model_name, scatter_iterations)
+    generate_scatter_data(G, device, seed, save_name, network_folder, truncation_cutoff, truncation_psi, age_model_name, scatter_iterations, make_id_vs_age=make_id_vs_age)
     if make_truncation_data:
         print("Generating truncation data...")
         generate_truncation_data(G, device, seed, save_name, network_folder)
@@ -85,7 +86,7 @@ def generate_data(
         save_image_folder(save_name, network_folder, G, device, truncation_cutoff, truncation_psi)
     del G
 
-def generate_scatter_data(G, device, seed, save_name, network_folder, truncation_cutoff, truncation_psi, age_model_name, iterations):
+def generate_scatter_data(G, device, seed, save_name, network_folder, truncation_cutoff, truncation_psi, age_model_name, iterations, make_id_vs_age=True):
     ## Age evaluation
     magface = FaceIDLoss(device, model="MagFace")
 
@@ -146,17 +147,18 @@ def generate_scatter_data(G, device, seed, save_name, network_folder, truncation
 
 
         # same person, diff age
-        c_params_2 = torch.cat((camera_params, torch.tensor([age_2], device=device)), 1).float()
-        c_2 = torch.cat((conditioning_params, torch.tensor([age_2], device=device)), 1)
-        ws_2 = G.mapping(zi[None,:], c_2, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff)
-        img_2 = G.synthesis(ws_2, c_params_2)['image']
-        age_hat_2, logits_2 = age_model.estimate_age(img_2)
+        if make_id_vs_age:
+            c_params_2 = torch.cat((camera_params, torch.tensor([age_2], device=device)), 1).float()
+            c_2 = torch.cat((conditioning_params, torch.tensor([age_2], device=device)), 1)
+            ws_2 = G.mapping(zi[None,:], c_2, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff)
+            img_2 = G.synthesis(ws_2, c_params_2)['image']
+            age_hat_2, logits_2 = age_model.estimate_age(img_2)
         
-        v1 = id_model.get_feature_vector(img)
-        v2 = id_model.get_feature_vector(img_2)
-        cos_sim = cosine_sim_f(v1,v2)
+            v1 = id_model.get_feature_vector(img)
+            v2 = id_model.get_feature_vector(img_2)
+            cos_sim = cosine_sim_f(v1,v2)
 
-        age_diff = abs(normalize(age, rmin=-1, rmax=1, tmin=age_min, tmax=age_max) - normalize(age_2, rmin=-1, rmax=1, tmin=age_min, tmax=age_max))
+            age_diff = abs(normalize(age, rmin=-1, rmax=1, tmin=age_min, tmax=age_max) - normalize(age_2, rmin=-1, rmax=1, tmin=age_min, tmax=age_max))
 
         features = magface.get_feature_vector(img)
         mag = np.linalg.norm(features.cpu().numpy())
@@ -165,9 +167,15 @@ def generate_scatter_data(G, device, seed, save_name, network_folder, truncation
             age_true = normalize(age_true, rmin=age_min, rmax=age_max)
         elif age_loss_fn =="MSE":
             age_true = age[0]
-        res.append([age_hat.item(), age_true, angle_p, angle_y, mag, cos_sim.item(), age_diff[0]])
+        if make_id_vs_age:
+            res.append([age_hat.item(), age_true, angle_p, angle_y, mag, cos_sim.item(), age_diff[0]])
+        else:
+            res.append([age_hat.item(), age_true, angle_p, angle_y, mag])
 
-    columns = ["age_hat", "age_true", "angle_p", "angle_y", "mag", "cos_sim", "age_diff"]
+    if make_id_vs_age:
+        columns = ["age_hat", "age_true", "angle_p", "angle_y", "mag", "cos_sim", "age_diff"]
+    else:
+        columns = ["age_hat", "age_true", "angle_p", "angle_y", "mag"]
     df = pd.DataFrame(res, columns=columns)
     # Save as csv file
     save_dir = os.path.join("Evaluation","Runs", save_name)
