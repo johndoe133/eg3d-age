@@ -153,41 +153,96 @@ class StyleGAN2Loss(Loss):
         return total_loss
 
     def compute_weight(self, delta_age):
-        return 0.25 * torch.cos(torch.pi * delta_age) + 0.75
+        return 0.25 * torch.cos((torch.pi/2) * delta_age) + 0.75
 
     def run_id_loss3(self, z, c_swapped, neural_rendering_resolution):
-        new_c_swapped = c_swapped.clone() # used for the G.mapping step so the "scene identity" is preserved
-        id_loss = torch.tensor([], device=self.device)
-        idx = np.random.randint(0, len(z))
-        zi = z[idx]
-        
-        random_ages = [
+        """Third iteration of id loss.
+        Takes a random latent code from the batch (limited to one due to memory issues).
+        Generates four random ages by sampling uniformly from these intervals:
+        ```
+         random_ages = [
             uniform(-1, -0.5),
             uniform(-0.5,0),
             uniform(0, 0.5),
             uniform(0.5, 1)
         ]
-        age_ranges = len(random_ages)
-        new_c = torch.repeat_interleave(c_swapped[idx][None,:], age_ranges, axis=0)
-        new_c[:,-1] = torch.tensor(random_ages)
-        z_identical = torch.repeat_interleave(zi[None,:], age_ranges, axis=0)
-        latent_coords = torch.tensor([], device=self.device)
+        ```
+        Generates four new images with the same latent code but with four different ages
         
-        ws = self.G.mapping(z_identical, new_c)
-        c_params = torch.repeat_interleave(self.frontal_camera_params, age_ranges, axis=0)
-        gen_img = self.G.synthesis(ws, c_params, neural_rendering_resolution=neural_rendering_resolution, update_emas=False)
-        new_images = gen_img['image']
-        f = self.id_model.get_feature_vector(new_images)
-        
-        for k, l in list(combinations(list(range(age_ranges)), r=2)):
-            loss = 1 - self.cosine_sim(f[k][None,:], f[l][None,:])
-            weight = self.compute_weight(new_c[l, - 1] - new_c[k,-1])
-            weighted_loss = loss*weight
-            id_loss = torch.cat((id_loss, weighted_loss),0)
-        return id_loss.mean()
+        given by `random_ages`. Extracts feature vectors for each image and then finds id loss
+        for every combination of faces.
 
+        The loss is weighted using `compute_weight` so that a large age change has less effect than a smaller one.
+        The weight for no age change is 1 and is 0.5 for the maximum of age change of 2 (equivalent of age_min to age_max years).
 
-        
+        Args:
+            z (tensor): size [batch, 512]
+            c_swapped (tensor): conditions used to generate images in ``run_G``
+            neural_rendering_resolution (int): 
+
+        Returns:
+            tensor: mean id loss
+        """
+        new_c_swapped = c_swapped.clone() # used for the G.mapping step so the "scene identity" is preserved
+        idx = np.random.randint(0, len(z))
+        zi = z[idx]
+        if self.age_loss_fn == "MSE": # not using age categories
+            id_loss = torch.tensor([], device=self.device)
+            
+            random_ages = [
+                uniform(-1, -0.5),
+                uniform(-0.5,0),
+                uniform(0, 0.5),
+                uniform(0.5, 1)
+            ]
+            age_ranges = len(random_ages)
+            new_c = torch.repeat_interleave(new_c_swapped[idx][None,:], age_ranges, axis=0)
+            new_c[:,-1] = torch.tensor(random_ages)
+            z_identical = torch.repeat_interleave(zi[None,:], age_ranges, axis=0)
+            
+            ws = self.G.mapping(z_identical, new_c)
+            c_params = torch.repeat_interleave(self.frontal_camera_params, age_ranges, axis=0)
+            gen_img = self.G.synthesis(ws, c_params, neural_rendering_resolution=neural_rendering_resolution, update_emas=False)
+            new_images = gen_img['image']
+            f = self.id_model.get_feature_vector(new_images)
+            
+            for k, l in list(combinations(list(range(age_ranges)), r=2)):
+                loss = 1 - self.cosine_sim(f[k][None,:], f[l][None,:])
+                Delta_age=new_c[l, - 1] - new_c[k,-1]
+                weight = self.compute_weight(Delta_age)
+                weighted_loss = loss * weight
+                id_loss = torch.cat((id_loss, weighted_loss),0)
+            return id_loss.mean()
+        else: #categories
+            id_loss = torch.tensor([], device=self.device)
+            l = np.linspace(0,self.age_max-(self.age_max // 4),4)
+            random_ages_idx = [
+                np.random.randint(l[0],l[1]),
+                np.random.randint(l[1],l[2]),
+                np.random.randint(l[2],l[3]),
+                np.random.randint(l[3],self.age_max+1)
+            ]
+            random_ages = np.array([[0]*101]*4)
+            random_ages[[0,1,2,3], random_ages_idx] = 1
+            age_ranges = len(random_ages)
+            new_c = torch.repeat_interleave(new_c_swapped[idx][None,:], age_ranges, axis=0)
+            new_c[:, 25:] = torch.tensor(random_ages)
+            z_identical = torch.repeat_interleave(zi[None,:], age_ranges, axis=0)
+
+            ws = self.G.mapping(z_identical, new_c)
+            c_params = torch.repeat_interleave(self.frontal_camera_params, age_ranges, axis=0)
+            gen_img = self.G.synthesis(ws, c_params, neural_rendering_resolution=neural_rendering_resolution, update_emas=False)
+            new_images = gen_img['image']
+            f = self.id_model.get_feature_vector(new_images)
+
+            for k, l in list(combinations(list(range(age_ranges)), r=2)):
+                loss = 1 - self.cosine_sim(f[k][None,:], f[l][None,:])
+                Delta_age = torch.tensor(random_ages_idx[l] - random_ages_idx[k], device=self.device)
+                weight = self.compute_weight(Delta_age)
+                weighted_loss = loss * weight
+                id_loss = torch.cat((id_loss, weighted_loss),0)
+            return id_loss.mean()
+
 
 
     def run_id_loss(self, imgs, z, c, c_swapped, neural_rendering_resolution, margin=0.2, loss='MSE', update_emas=False, slope=10):
