@@ -13,19 +13,26 @@ from networks.MagFace.iresnet import iresnet100, iresnet50
 from training.mtcnn import MTCNN
 from skimage import transform as trans
 from kornia.geometry import warp_affine
+import insightface 
+from easydict import EasyDict
+import onnxruntime as ort
+ort.set_default_logger_severity(3)
 
 class FaceIDLoss:
-    """Module used for identity preservation. The available models are FaceNet and MagFace.
+    """Module used for identity preservation. The available models for training are FaceNet and MagFace.
+    ArcFace can only be used to evaluate since it isnt implemented in pytorch in this class.
     
     """
     def __init__(self, device, model = "FaceNet", resize_img = True):
         self.model = model
         self.mtcnn = MTCNN(device=device, selection_method="probability", thresholds=[0.2, 0.2, 0.2])
         self.device = device
+        
         if self.model == "FaceNet":
             self.align = self.mtcnn
             self.id_model = InceptionResnetV1(pretrained='vggface2', device=device).requires_grad_(requires_grad=False).eval()
             self.resize_shape = 160 # resize to 160 x 160
+        
         elif self.model == "MagFace":
             # bruger https://github.com/deepinsight/insightface/blob/cdc3d4ed5de14712378f3d5a14249661e54a03ec/python-package/insightface/utils/face_align.py
             # til alignment 
@@ -38,14 +45,44 @@ class FaceIDLoss:
             self.id_model = builder_inf(args_new())
             self.id_model = self.id_model.to(device).requires_grad_(requires_grad=False).eval()
             self.resize_shape = 112 # resize to 112 x 112
+        
         elif self.model == "ArcFace":
+            self.detection_model = self.load_face_detection_model('./networks/det_10g.onnx')
+            self.fr_model = self.load_face_recognition_model('./networks/ms1mv3_r100.onnx')
             self.align = self.ArcFaceAlign # to be done
             # https://onedrive.live.com/?authkey=%21AFZjr283nwZHqbA&cid=4A83B6B633B029CC&id=4A83B6B633B029CC%215751&parId=4A83B6B633B029CC%215585&o=OneUp
-            self.id_model = iresnet50()
-            self.id_model.load_state_dict(torch.load("./networks/arcfacers50.pth"))
-            self.id_model = self.id_model.to(device).requires_grad_(requires_grad=False).eval()
+            # self.id_model = iresnet50()
+            # self.id_model.load_state_dict(torch.load("./networks/arcfacers50.pth"))
+            # self.id_model = self.id_model.to(device).requires_grad_(requires_grad=False).eval()
             self.resize_shape = 112 # resize to 112 x 112
+
         self.resize_img = resize_img
+
+    def get_feature_vector_arcface(self, imgs):
+        # only for evaluation
+        if self.model != "ArcFace":
+            raise AttributeError
+        if torch.is_tensor(imgs):
+            imgs = (imgs.permute(0, 2, 3, 1) * 127.5 + 128).clamp(0, 255).to(torch.uint8)
+            imgs = imgs[0].cpu().numpy()
+        detected_face = self.detection_model.detect(imgs)
+        detected_face = EasyDict({'kps': detected_face[1][0], 'det':detected_face[0][0]})
+        
+        face_embedding = self.fr_model.get(imgs, detected_face)   
+        return torch.tensor(face_embedding[None,:]) # return type so it can be used in torch.cosineSimilarity()
+
+
+    def load_face_detection_model(self, det_model_path):
+        providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
+        det_model = insightface.model_zoo.get_model(det_model_path, providers=providers)
+        det_model.prepare(ctx_id=0, det_size=(512, 512), det_thresh=0.01, input_size = (512, 512))
+        return det_model
+
+    def load_face_recognition_model(self, fr_model_path):
+        providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
+        fr_model = insightface.model_zoo.get_model(fr_model_path, providers=providers)
+        fr_model.prepare(ctx_id =0)
+        return fr_model
 
     def get_feature_vector(self, img):
         """Extracts feature vector using `self.id_model`. Will align according to what
@@ -78,6 +115,14 @@ class FaceIDLoss:
         return feature_vector
 
     def MagFaceAlign(self, imgs):
+        """Standard alignment process of MagFace. 
+
+        Args:
+            imgs (tensor): image tensor
+
+        Returns:
+            list: aligned images, None if face was not detected 
+        """
         #imgs_rgb = self.transform_to_RGB(imgs)
         aligned_imgs = []
         imgs_rgb = imgs # delete
@@ -501,30 +546,27 @@ def get_torch_home():
 
 if __name__=="__main__":
     device = torch.device("cuda")
-    model = FaceIDLoss(device, model="MagFace")
-    p = '/zhome/d7/6/127158/Documents/eg3d-age/age-estimation-pytorch/in/img00000004.png'
-    p2 = '/zhome/d7/6/127158/Documents/eg3d-age/age-estimation-pytorch/in/img00000001.png'
+    model = FaceIDLoss(device, model="ArcFace")
+    p = '/zhome/d7/6/127158/Documents/eg3d-age/age-estimation-pytorch/in/img00000022.png'
+    p2 = '/zhome/d7/6/127158/Documents/eg3d-age/age-estimation-pytorch/in/img00000024.png'
     image1 = cv2.imread(p)
-    image1 = cv2.cvtColor(image1, cv2.COLOR_BGR2RGB)
+    # image1 = cv2.cvtColor(image1, cv2.COLOR_BGR2RGB)
     img_tensor = torch.from_numpy(image1).float()
     img_tensor = img_tensor.to(device).requires_grad_(True)
-    print(img_tensor.shape)
-    mtcnn=MTCNN(device=device)
-    # print(mtcnn(img_tensor))
-    # print(mtcnn(img_tensor[None,:,:,:]))
-    # print("Hello")
-    # print(img_tensor.permute(2,0,1)[None,:,:,:].shape)
-    # v1 = model.get_feature_vector_test(img_tensor.float())
-
+    
+    f1 = model.get_feature_vector_arcface(img_tensor[None,:,:,:].permute(0,3,1,2))
+    print(f1)
     image2 = cv2.imread(p2)
-    image2 = cv2.cvtColor(image2, cv2.COLOR_BGR2RGB)
+    # image2 = cv2.cvtColor(image2, cv2.COLOR_BGR2RGB)
     img_tensor2 = torch.from_numpy(image2)
     img_tensor2 = img_tensor2.to(device)
     img_3 = torch.ones((3,512,512)).to(device)
     img = torch.stack([img_3, img_tensor.permute(2,0,1), img_tensor2.permute(2,0,1)])
-    v2 = model.get_feature_vector(img.float())
+
+    f2 = model.get_feature_vector_arcface(image2)
+
     # stack image1 og 2 og se om det virker med alignment
     cosine_sim_f = torch.nn.CosineSimilarity()
-    print("SIM:", cosine_sim_f(v1, v2))
-    print("Norm", np.linalg.norm(v2.detach().cpu().numpy()))
+    print("SIM:", cosine_sim_f(torch.tensor([f1]), torch.tensor([f2])))
+    # print("Norm", np.linalg.norm(v2.detach().cpu().numpy()))
 
