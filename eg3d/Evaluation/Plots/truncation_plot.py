@@ -54,7 +54,6 @@ def truncation_plot(network_folder, save_path):
     plt.scatter(truncation, mean_mag)
     plt.xlabel("Truncation factor")
     plt.ylabel(r"MagFace magnitude")
-    plt.legend()
     fig_name = "magvstrunc"
     plt.savefig(save_path + f"/{fig_name}" + ".png",bbox_inches='tight')
     plt.savefig(save_path + f"/{fig_name}" + ".pgf",bbox_inches='tight')
