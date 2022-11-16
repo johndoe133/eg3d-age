@@ -31,6 +31,7 @@ parser.add_argument("--alternate_losses", help="", default=False)
 parser.add_argument("--alternate_after", help="", default=100000)
 parser.add_argument("--initial_age_training", help="", default=0)
 parser.add_argument('--crop_before_estimate_ages', help="", default=False)
+parser.add_argument('--training_time', help='', default='24')
 
 
 args = parser.parse_args()
@@ -87,6 +88,7 @@ submit_script = template_text.format(
                         "alternate_after": args.alternate_after,
                         "initial_age_training": args.initial_age_training,
                         "crop_before_estimate_ages": args.crop_before_estimate_ages,
+                        'training_time': args.training_time,
 
                     }
                 )
