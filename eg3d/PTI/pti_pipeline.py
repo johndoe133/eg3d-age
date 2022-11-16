@@ -1,5 +1,6 @@
 ## TO HOLD THE ENTIRE PTI PIPELINE
 
+from typing import Optional
 from edit_age import edit_age
 from pti_optimization import run
 from preprocess_images import pre_process_images
@@ -15,7 +16,7 @@ def normalize(x, rmin = 5, rmax = 80, tmin = -1, tmax = 1):
     return np.round(z, 4)
 
 @click.command()
-@click.option('--age', help='Target age of the image (not normalized)', required=True, type=int)
+@click.option('--age', help='Set the age of the subject yourself instead of using pretrained age model', required=False, type=int)
 @click.option('--image_name', help="", required=True)
 @click.option('--preprocess', help="Whether to preprocess images", default=False)
 @click.option('--model_path', help="Relative path to the model", required=True)
@@ -23,7 +24,7 @@ def normalize(x, rmin = 5, rmax = 80, tmin = -1, tmax = 1):
 @click.option('--pti_iterations', help="PTI inversion iterations", required=False, default=350, type=int)
 @click.option('--run_pti_inversion', help="Whether to run the inversion", required=False, default=True, type=bool)
 def pti_pipeline(
-    age: int,
+    age: Optional[int],
     image_name: str,
     preprocess: bool,
     model_path: str,
@@ -35,12 +36,13 @@ def pti_pipeline(
     hyperparameters.first_inv_steps = w_iterations
     hyperparameters.max_pti_steps = pti_iterations
 
-    age = normalize(age)
-
+    if age is not None:
+        age = normalize(age, rmin=hyperparameters.age_min, rmax=hyperparameters.age_max)
+        
     if preprocess:
         pre_process_images()
 
-    c = run(model_path, image_name, run_pti_inversion)
+    c = run(model_path, image_name, run_pti_inversion, age)
 
     end_time = time.time()
     print(f"Optimization run time: {int(end_time - start_time)} seconds")

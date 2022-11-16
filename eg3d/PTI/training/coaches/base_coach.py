@@ -128,7 +128,6 @@ class BaseCoach:
         return loss, l2_loss_val, loss_lpips
 
     def forward(self, z):
-        ### Camera params
         w = self.G.mapping(z, self.c)
         generated_images = self.G.synthesis(w, self.c, noise_mode='const', force_fp32=True)['image']
         return generated_images

@@ -6,6 +6,13 @@ from training.coaches.base_coach import BaseCoach
 from utils.log_utils import log_images_from_w
 from PIL import Image
 
+
+def denormalize(z, rmin = 0, rmax = 75, tmin = -1, tmax = 1):
+    """Cant import from training.training_loop due to naming of folders...
+    """
+    x = (z*(rmax - rmin)- tmin*(rmax-rmin))/(tmax-tmin)+rmin
+    return x
+
 class SingleIDCoach(BaseCoach):
 
     def __init__(self, c, image_name, data_loader, use_wandb):
@@ -23,7 +30,7 @@ class SingleIDCoach(BaseCoach):
 
         for fname, image in tqdm(self.data_loader):
             if fname[0] != self.image_name: 
-                continue # dont train on the images that is not specified
+                continue # dont train on the images that is not specified in shell script pti.sh
             image_name = fname[0]
 
             self.restart_training()
@@ -40,11 +47,15 @@ class SingleIDCoach(BaseCoach):
                 w_pivot = self.load_inversions(w_path_dir, image_name)
 
             elif not hyperparameters.use_last_w_pivots or w_pivot is None:
-                z_pivot = self.calc_inversions(image, image_name, self.c)
+                z_pivot, age_pivot = self.calc_inversions(image, image_name, self.c)
+                age_pivot = age_pivot.detach()
+                self.c[:,-1] = age_pivot # update the conditioning parameters so that the found
+                # optmized age is used instead of the previously estimated starting point
+                print("Optimized age:", denormalize(age_pivot, rmin=hyperparameters.age_min, rmax=hyperparameters.age_max).item())
+
 
             # w_pivot = w_pivot.detach().clone().to(global_config.device)
             z_pivot = z_pivot.to(global_config.device)
-
             torch.save(z_pivot, f'{embedding_dir}/{image_name}.pt')
             log_images_counter = 0
             real_images_batch = image.to(global_config.device)
@@ -64,7 +75,8 @@ class SingleIDCoach(BaseCoach):
                 if loss_lpips <= hyperparameters.LPIPS_value_threshold:
                     save_img = (generated_images.permute(0, 2, 3, 1)* 127.5 + 128).clamp(0, 255).to(torch.uint8)
                     images.append(save_img)
-                    break
+                    return age
+                    
 
                 loss.backward()
                 self.optimizer.step()
@@ -90,3 +102,4 @@ class SingleIDCoach(BaseCoach):
             save_name = os.path.join(home_dir, path, "pti_optimization.png")
             img = torch.cat(images, dim=2)
             Image.fromarray(img[0].cpu().numpy(), 'RGB').save(save_name)
+            return age_pivot

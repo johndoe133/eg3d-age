@@ -134,8 +134,10 @@ def generate_scatter_data(G, device, seed, save_name, network_folder, truncation
     res = []
 
     training_id_model = training_option['loss_kwargs']['id_model']
-    id_model_name = "MagFace" if (training_id_model=="FaceNet" or training_id_model=="ArcFace") else "FaceNet"
-    id_model = FaceIDLoss(device, model=id_model_name)
+    
+    id_model = FaceIDLoss(device, model = training_id_model)
+
+    arcface = FaceIDLoss(device, model="ArcFace")
         
     cosine_sim_f = torch.nn.CosineSimilarity()
     for zi, age, age_2, angle_p, angle_y in tqdm(zip(z, ages, ages_2, angles_p, angles_y), total=iterations):
@@ -143,8 +145,8 @@ def generate_scatter_data(G, device, seed, save_name, network_folder, truncation
         conditioning_cam2world_pose = LookAtPoseSampler.sample(np.pi/2, np.pi/2, cam_pivot, radius=cam_radius, device=device)
         camera_params = torch.cat([cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)
         conditioning_params = torch.cat([conditioning_cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)    
-        c = torch.cat((conditioning_params, torch.tensor([age], device=device)), 1)
-        c_params = torch.cat((camera_params, torch.tensor([age], device=device)), 1).float()
+        c = torch.cat((conditioning_params, torch.tensor(np.array([age]), device=device)), 1)
+        c_params = torch.cat((camera_params, torch.tensor(np.array([age]), device=device)), 1).float()
         ws = G.mapping(zi[None,:], c, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff)
         img = G.synthesis(ws, c_params)['image']
         age_hat, logits = age_model.estimate_age(img)
@@ -161,11 +163,11 @@ def generate_scatter_data(G, device, seed, save_name, network_folder, truncation
             v1 = id_model.get_feature_vector(img)
             v2 = id_model.get_feature_vector(img_2)
             cos_sim = cosine_sim_f(v1,v2)
-
             age_diff = abs(normalize(age, rmin=-1, rmax=1, tmin=age_min, tmax=age_max) - normalize(age_2, rmin=-1, rmax=1, tmin=age_min, tmax=age_max))
 
-        features = magface.get_feature_vector(img)
-        mag = np.linalg.norm(features.cpu().numpy())
+        if training_id_model != "MagFace":
+            v1 = magface.get_feature_vector(img)
+        mag = np.linalg.norm(v1.cpu().numpy())
         if age_loss_fn == "CAT":
             age_true = list(age).index(1)
             age_true = normalize(age_true, rmin=age_min, rmax=age_max)
@@ -180,6 +182,7 @@ def generate_scatter_data(G, device, seed, save_name, network_folder, truncation
         columns = ["age_hat", "age_true", "angle_p", "angle_y", "mag", "cos_sim", "age_diff"]
     else:
         columns = ["age_hat", "age_true", "angle_p", "angle_y", "mag"]
+
     df = pd.DataFrame(res, columns=columns)
     # Save as csv file
     save_dir = os.path.join("Evaluation","Runs", save_name)
@@ -198,7 +201,6 @@ def generate_id_data(
     training_option = json.load(f)
     f.close()
     training_id_model = training_option['loss_kwargs']['id_model']
-    id_model = "MagFace" if (training_id_model=="FaceNet" or training_id_model=="ArcFace") else "FaceNet"
     cosine_sim_f = torch.nn.CosineSimilarity()
 
     age_min = training_option['age_min']
@@ -206,7 +208,8 @@ def generate_id_data(
 
     age_loss_fn = training_option['age_loss_fn']
     ages = list(map(int, np.linspace(age_min, age_max, 5)))
-    id_model = FaceIDLoss(device, model=id_model)
+    id_model = FaceIDLoss(device, model=training_id_model)
+    arcface = FaceIDLoss(device, model="ArcFace")
     res = []
     for seed in tqdm(seeds):
         for age1 in ages:
@@ -218,6 +221,7 @@ def generate_id_data(
             ws = G.mapping(z, c, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff)
             generated_image_1 =  G.synthesis(ws, c_camera)['image']
             feature_v_1 = id_model.get_feature_vector(generated_image_1)
+            feature_v_1_arcface = arcface.get_feature_vector_arcface(generated_image_1)
             for age2 in ages:
                 if age1 == age2:
                     continue # skip comparing similar images
@@ -226,11 +230,13 @@ def generate_id_data(
                 ws = G.mapping(z, c, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff)
                 generated_image_2 =  G.synthesis(ws, c_camera)['image']
                 feature_v_2 = id_model.get_feature_vector(generated_image_2)
+                feature_v_2_arcface = arcface.get_feature_vector_arcface(generated_image_2)
                 cosine_sim = cosine_sim_f(feature_v_1, feature_v_2)
-                res.append([seed, age1, age2, angle_y, angle_p, cosine_sim.item()])
+                cosine_sim_arcface = cosine_sim_f(feature_v_1_arcface, feature_v_2_arcface)
+                res.append([seed, age1, age2, angle_y, angle_p, cosine_sim.item(), cosine_sim_arcface.item(), training_id_model])
 
     # create dataframe
-    columns = ["seed", "age1", "age2", "angle_y", "angle_p", "cosine_sim"]
+    columns = ["seed", "age1", "age2", "angle_y", "angle_p", "cosine_sim", "cosine_sim_arcface", "id_train"]
     df = pd.DataFrame(res, columns=columns)
 
     # Save as csv file
@@ -344,8 +350,8 @@ def generate_image(G, seed, device, path, save_name):
                 conditioning_cam2world_pose = LookAtPoseSampler.sample(np.pi/2, np.pi/2, cam_pivot, radius=cam_radius, device=device)
                 camera_params = torch.cat([cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)
                 conditioning_params = torch.cat([conditioning_cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)    
-                c = torch.cat((conditioning_params, torch.tensor([age], device=device)), 1)
-                c_params = torch.cat((camera_params, torch.tensor([age], device=device)), 1).float()
+                c = torch.cat((conditioning_params, torch.tensor(np.array([age]), device=device)), 1)
+                c_params = torch.cat((camera_params, torch.tensor(np.array([age]), device=device)), 1).float()
 
                 ws = G.mapping(z, c, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff)
                 img = G.synthesis(ws, c_params)['image']
@@ -445,7 +451,7 @@ def get_conditioning_parameter(age, G, device, age_loss_fn, age_min, age_max, fo
     cam_radius = G.rendering_kwargs.get('avg_camera_radius', 2.7)
     conditioning_cam2world_pose = LookAtPoseSampler.sample(np.pi/2, np.pi/2, cam_pivot, radius=cam_radius, device=device)
     conditioning_params = torch.cat([conditioning_cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)
-    conditioning_params = torch.cat((conditioning_params, torch.tensor([age_c], device=device)), 1)
+    conditioning_params = torch.cat((conditioning_params, torch.tensor(np.array([age_c]), device=device)), 1)
     return conditioning_params.float()
 
 def get_camera_parameters(age, G, device, angle_y, angle_p, age_loss_fn, age_min, age_max, fov_deg = 18.837):
@@ -476,7 +482,7 @@ def get_camera_parameters(age, G, device, angle_y, angle_p, age_loss_fn, age_min
     cam_radius = G.rendering_kwargs.get('avg_camera_radius', 2.7)
     cam2world_pose = LookAtPoseSampler.sample(np.pi/2 + angle_y, np.pi/2 + angle_p, cam_pivot, radius=cam_radius, device=device)
     camera_params = torch.cat([cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)
-    camera_params = torch.cat((camera_params, torch.tensor([age_c], device=device)), 1)
+    camera_params = torch.cat((camera_params, torch.tensor(np.array([age_c]), device=device)), 1)
     return camera_params.float()
 
 def generate_truncation_data(G, device, seed, save_name, network_folder):
@@ -566,8 +572,8 @@ def save_image_folder(save_name, network_folder, G, device, truncation_cutoff, t
         conditioning_cam2world_pose = LookAtPoseSampler.sample(np.pi/2, np.pi/2, cam_pivot, radius=cam_radius, device=device)
         camera_params = torch.cat([cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)
         conditioning_params = torch.cat([conditioning_cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)    
-        c = torch.cat((conditioning_params, torch.tensor([age], device=device)), 1)
-        c_params = torch.cat((camera_params, torch.tensor([age], device=device)), 1).float()
+        c = torch.cat((conditioning_params, torch.tensor(np.array([age]), device=device)), 1)
+        c_params = torch.cat((camera_params, torch.tensor(np.array([age]), device=device)), 1).float()
 
         ws = G.mapping(zi[None,:], c, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff)
         img = G.synthesis(ws, c_params)['image']
@@ -585,8 +591,8 @@ def save_image_folder(save_name, network_folder, G, device, truncation_cutoff, t
         conditioning_cam2world_pose = LookAtPoseSampler.sample(np.pi/2, np.pi/2, cam_pivot, radius=cam_radius, device=device)
         camera_params = torch.cat([cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)
         conditioning_params = torch.cat([conditioning_cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)    
-        c = torch.cat((conditioning_params, torch.tensor([age], device=device)), 1)
-        c_params = torch.cat((camera_params, torch.tensor([age], device=device)), 1).float()
+        c = torch.cat((conditioning_params, torch.tensor(np.array([age]), device=device)), 1)
+        c_params = torch.cat((camera_params, torch.tensor(np.array([age]), device=device)), 1).float()
 
         ws = G.mapping(zi[None,:], c, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff)
         img = G.synthesis(ws, c_params)['image']

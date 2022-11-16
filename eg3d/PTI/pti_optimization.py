@@ -31,17 +31,18 @@ hyperparameters.use_locality_regularization = False
 
 device = torch.device('cuda')
 
-def denormalize(z, rmin = 5, rmax = 80, tmin = -1, tmax = 1):
+def denormalize(z, rmin = 0, rmax = 75, tmin = -1, tmax = 1):
     """Cant import from training.training_loop due to naming of folders...
     """
     x = (z*(rmax - rmin)- tmin*(rmax-rmin))/(tmax-tmin)+rmin
     return x
 
-def run(model_path, image_name, run_pti_inversion):
+def run(model_path, image_name, run_pti_inversion, age):
     #Load models
+    print(f"Inverting {image_name}...")
     paths_config.stylegan2_ada_ffhq = model_path
     # age_estimator = AgeEstimator()
-    age_estimator = AgeEstimatorNew(torch.device("cuda"))
+    age_estimator = AgeEstimatorNew(torch.device("cuda"), age_min=hyperparameters.age_min, age_max=hyperparameters.age_max)
 
     #Load pose parameters 
     home = os.path.expanduser('~')
@@ -58,15 +59,19 @@ def run(model_path, image_name, run_pti_inversion):
     image =  cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     image = torch.from_numpy(image).float()
     estimated_age = age_estimator.estimate_age_rgb(image[None,:,:,:]) # so input shape is [1,3,512,512]
-    c.append(estimated_age.item())
-    print("######################################")
-    print("Estimated age is", denormalize(estimated_age).item())
-    print("######################################")
+    if age is None:
+        c.append(estimated_age.item())
+        print("######################################")
+        print("Starting age is", denormalize(estimated_age, rmin=hyperparameters.age_min, rmax=hyperparameters.age_max).item())
+        print("######################################")
+    else:
+        c.append(float(age))
     c = np.reshape(c, (1, 26))
     c = torch.FloatTensor(c).cuda()
     
     if run_pti_inversion:
         print("Running PTI optimization...")
-        model_id = run_PTI(c, image_name, use_wandb=False, use_multi_id_training=False)
+        model_id, age= run_PTI(c, image_name, use_wandb=False, use_multi_id_training=False)
         print("Finished running PTI optimization")
+    c[:,-1] = age
     return c

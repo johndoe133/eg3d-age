@@ -39,7 +39,7 @@ def average_face(
     save_path = os.path.join("Evaluation", "Runs", save_name)
     os.makedirs(save_path, exist_ok=True)
 
-    np.random.seed(124)
+    np.random.seed(42)
     batch_size = 4
     faces_per_age = 2000 // batch_size
 

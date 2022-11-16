@@ -17,9 +17,17 @@ import dlib
 import cv2
 
 class AgeEstimatorNew():
-    """Takes the device as input.
+    """Class to estimate the apparent age of the subject on an image. 
+    Uses a pretrained CNN to estimate. Originally trained by
+    https://github.com/yu4u/age-estimation-pytorch. 
+    
+    Args:
+            device: torch.device()
+            age_min (int, optional): In what range the denormalization is done. Defaults to 0.
+            age_max (int, optional): In what range the denormalization is done. Defaults to 100.
+            crop (bool, optional): Whether to crop the images as the author. Tests show little to no difference in outcome. Defaults to False.
     """
-    def __init__(self, device, age_min=0, age_max=100):
+    def __init__(self, device, age_min=0, age_max=100, crop=False):
         root = os.path.expanduser('~')
         model = get_model(model_name=cfg.MODEL.ARCH, pretrained=None)
         self.age_model = model.to(device)
@@ -35,8 +43,9 @@ class AgeEstimatorNew():
         self.ages = torch.arange(0,101, device = self.device)
         self.age_min = age_min
         self.age_max = age_max
+        self.crop = crop
     
-    def estimate_age(self, gen_img, normalize = True, crop=False):
+    def estimate_age(self, gen_img, normalize = True):
         """Takes output of G.synthesis and estimates the age of the synthetic person.
         Input shape is [batch_size, channels, w, h]. Images are crop based on the detections.
         The cropped images are converted to BGR and estimated using a pretrained age estimator.
@@ -53,9 +62,9 @@ class AgeEstimatorNew():
             tensor, tensor: predicted ages, logits
         """
         img_RGB = (gen_img * 127.5 + 128).clamp(0, 255) # rescale image values to be between 0 and 255
-        if crop:
+        if self.crop:
             img_RGB_detached = img_RGB.detach() 
-            detections = self.detect_faces(img_RGB_detached)
+            detections = self.detect_faces(img_RGB_detached.permute(0,2,3,1))
             crops = self.crop_images(detections, img_RGB)
         else:
             # resize to fit age model
@@ -91,9 +100,9 @@ class AgeEstimatorNew():
         logits_categorized = zeros.index_add_(1, buckets - 1, logits)
         return logits_categorized
 
-    def estimate_age_rgb(self, image, normalize = True, crop = False):
+    def estimate_age_rgb(self, image, normalize = True):
         image = image.type('torch.FloatTensor')
-        if crop:
+        if self.crop:
             detections = self.detect_faces(image)
             image = image.permute(0,3,1,2)
             crops = self.crop_images(detections, image)
@@ -119,7 +128,7 @@ class AgeEstimatorNew():
         detection.
 
         Args:
-            img_RGB (tensor): input shape [batch_size, channels, w, h]
+            img_RGB (tensor): input shape [batch_size, w, h, channels]
 
         Returns:
             list: detections
@@ -128,7 +137,6 @@ class AgeEstimatorNew():
         
         detections = [] # x1, y1, x2, y2, w, h 
         img_RGB = F.interpolate(img_RGB, [640, 640],  mode='bilinear', align_corners=False) 
-        
         img_RGB = img_RGB.permute(0,2,3,1) # converted to shape [batch_size, w, h, channels] to fit dlib detector
         
         for image in img_RGB: # iterate over the batch
@@ -157,10 +165,10 @@ class AgeEstimatorNew():
         Returns:
             tensor: tensor of images cropped and resized to fit age model
         """
+        img_RGB = F.interpolate(img_RGB, [640, 640],  mode='bilinear', align_corners=False) 
         batch_size, channels , img_w, img_h = img_RGB.shape[0] , img_RGB.shape[1], img_RGB.shape[2], img_RGB.shape[3]
         cropped = torch.empty(batch_size, channels, self.img_size, self.img_size)
         for i in range(batch_size):
-            
             x1, y1, x2, y2, w, h = detections[i]
             xw1 = max(int(x1 - self.margin * w), 0)
             yw1 = max(int(y1 - self.margin * h), 0)
@@ -176,16 +184,27 @@ class AgeEstimatorNew():
         return torch.round(z, decimals=4)
 
 class AgeEstimator():
-    def __init__(self, age_min=0, age_max=100):
+    """Class implementing the DEX age estimation model. 
+
+    Args:
+            device: torch.device()
+            age_min (int, optional): In what range the denormalization is done. Defaults to 0.
+            age_max (int, optional): In what range the denormalization is done. Defaults to 100.
+    """
+    def __init__(self, device, age_min=0, age_max=100):
         root = os.path.expanduser('~')
         self.age_model_path = os.path.join(root, "Documents/eg3d-age/eg3d/networks/dex", 'pth/age_sd.pth')
         self.age_model = Age()
         self.age_model.load_state_dict(torch.load(self.age_model_path))
-        self.age_model.requires_grad_(requires_grad=False) # weights are freezed 
+        self.age_model.requires_grad_(requires_grad=False).to(device) # weights are freezed 
         self.age_model.eval()
-        self.n = torch.arange(0,101)
+        self.n = torch.arange(0,101).to(device)
         self.age_min = age_min
         self.age_max = age_max
+        self.detector = dlib.get_frontal_face_detector()
+        self.img_size = 224
+        self.margin = 0.4
+        self.device=device
 
     def estimate_age(self, gen_img):
         """Takes output of G.synthesis and estimates the age of the synthetic person
@@ -203,6 +222,17 @@ class AgeEstimator():
         age_predictions, logits = self.predict_ages(img)
         age_predictions = self.normalize_ages(age_predictions, rmin=self.age_min, rmax=self.age_max)
         return age_predictions, logits
+
+    def estimate_age_rgb(self, img, normalize=True):
+        img = img.float()
+        img = torch.floor(img) # round of pixels
+        detections = self.detect_faces(img)
+        crops=self.crop_images(detections, img.permute(0,3,1,2))
+        crops = crops.to(self.device)
+        age_predictions, _ = self.predict_ages(crops)
+        if normalize:
+            age_predictions = self.normalize_ages(age_predictions, rmin=self.age_min, rmax=self.age_max)
+        return age_predictions
 
     def normalize_ages(self, age, rmin = 5, rmax = 80, tmin = -1, tmax = 1):
         z = ((age - rmin) / (rmax - rmin)) * (tmax - tmin) + tmin
@@ -222,12 +252,69 @@ class AgeEstimator():
         """Resize image tensor to fit age model
 
         Args:
-            img (tensor): 
+            img (tensor): input shape [batch, c, w, h]
 
         Returns:
-            tensor: resized tensor
+            tensor: resized tensor of shape [batch, c, w, h]
         """
-        return F.interpolate(img, [224,224],  mode='bilinear', align_corners=True)    
+        return F.interpolate(img, [224,224],  mode='bilinear', align_corners=True)   
+
+    def detect_faces(self, img_RGB):
+        """Detects faces using `dlib.get_frontal_face_detector()`. Return a list
+        of coordinates used to crop the image. Images are resized to 640 x 640 before
+        detection.
+
+        Args:
+            img_RGB (tensor): input shape [batch_size, w, h, channels]
+
+        Returns:
+            list: detections
+        """
+        img_RGB = img_RGB.permute(0,3,1,2)
+        
+        detections = [] # x1, y1, x2, y2, w, h 
+        img_RGB = F.interpolate(img_RGB, [640, 640],  mode='bilinear', align_corners=False) 
+        img_RGB = img_RGB.permute(0,2,3,1) # converted to shape [batch_size, w, h, channels] to fit dlib detector
+        
+        for image in img_RGB: # iterate over the batch
+            width, height = image.shape[0], image.shape[0]
+            image = image.to(torch.uint8)
+            image = image.cpu().numpy()
+            detected = self.detector(image, 1)
+            if len(detected) == 0:
+                # no face was found - use the whole image
+                x1, y1, x2, y2, w, h = 0, 0, width, height, width, height
+            else:
+                d = detected[0]
+                x1, y1, x2, y2, w, h = d.left(), d.top(), d.right() + 1, d.bottom() + 1, d.width(), d.height()
+            detections.append([x1, y1, x2, y2, w, h])
+    
+        return detections
+
+    def crop_images(self, detections, img_RGB):
+        """Crops the images using predetermined coordinates from `detect_faces`.
+        Resizes the cropped image to fit the age model.
+
+        Args:
+            detections (list): list of detections
+            img_RGB (tensor):  input shape [batch_size, channels, w, h]
+
+        Returns:
+            tensor: tensor of images cropped and resized to fit age model
+        """
+        img_RGB = F.interpolate(img_RGB, [640, 640],  mode='bilinear', align_corners=False) 
+        batch_size, channels , img_w, img_h = img_RGB.shape[0] , img_RGB.shape[1], img_RGB.shape[2], img_RGB.shape[3]
+        cropped = torch.empty(batch_size, channels, self.img_size, self.img_size)
+        for i in range(batch_size):
+            x1, y1, x2, y2, w, h = detections[i]
+            xw1 = max(int(x1 - self.margin * w), 0)
+            yw1 = max(int(y1 - self.margin * h), 0)
+            xw2 = min(int(x2 + self.margin * w), img_w - 1)
+            yw2 = min(int(y2 + self.margin * h), img_h - 1)
+            face_crop = img_RGB[i][:, yw1:yw2 + 1, xw1:xw2 + 1]
+            face_crop_resize = F.interpolate(face_crop[None,:,:,:], [self.img_size, self.img_size],  mode='bilinear', align_corners=False) 
+            cropped[i] = face_crop_resize[0]
+        return cropped 
 
 def get_model(model_name="se_resnext50_32x4d", num_classes=101, pretrained="imagenet"):
     model = pretrainedmodels.__dict__[model_name](pretrained=pretrained)
@@ -237,17 +324,21 @@ def get_model(model_name="se_resnext50_32x4d", num_classes=101, pretrained="imag
     return model
 
 if __name__ == "__main__":
-    age_model = AgeEstimatorNew(torch.device("cuda"))
-    p = "/zhome/d7/6/127158/Documents/eg3d-age/age-estimation-pytorch/in"
-    
-    for path in sorted(os.listdir(os.path.join(p))):
-        if 'dataset' in path:
-            continue
-        image_path = os.path.join(p, path)
+    from training_loop import denormalize
+    print(denormalize(-0.9557, rmin=0, rmax=75))
+    age_model = AgeEstimatorNew(torch.device("cuda"), crop=True)
+    age_model2 = AgeEstimator(torch.device("cuda"), age_max=75)
+    folder = "/zhome/d7/6/127158/Documents/eg3d-age/age-estimation-pytorch/in"
+    for name in sorted(os.listdir(folder)):
+        image_path = os.path.join(folder, name)
         image = cv2.imread(image_path)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         img_tensor = torch.from_numpy(image)
-        img_tensor = img_tensor.to("cuda:0")
-        predicted_age = age_model.estimate_age_rgb(img_tensor[None,:,:,:], crop=True, normalize=False).item()
-        print(path, "age:",predicted_age)
+        img_tensor = img_tensor.to("cuda")
+        predicted_age = age_model.estimate_age_rgb(img_tensor[None,:,:,:], normalize=False).item()
+        predicted_age2 = age_model2.estimate_age_rgb(img_tensor[None,:,:,:], normalize=False).item()
+        print(name, "age:", predicted_age, predicted_age2)
+    image = torch.randn(1,3,512,512)
+    # print(age_model.estimate_age(image))
+
         

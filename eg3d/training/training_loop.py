@@ -178,7 +178,7 @@ def generate_age(minimum, maximum, distribution = "uniform"):
     """
     
     if distribution == "uniform":
-        r = np.random.randint(minimum, maximum + 1, size=1)  
+        r = np.random.uniform(minimum, maximum + 1, size=1).round(4)
     elif distribution == "triangular":
         r = np.random.triangular(minimum, minimum + (maximum-minimum) // 2, size = 1) 
     return normalize(r, rmin=minimum, rmax=maximum)
@@ -404,12 +404,10 @@ def training_loop(
             all_gen_c = [training_set.get_label(np.random.randint(len(training_set))) for _ in range(len(phases) * batch_size)]
             # replace age sampled from dataset.json with generated age between range
             if age_loss_fn == "CAT":
-                pass
-                # cats = [0] * 101 # lav om
-                # age = np.random.randint(age_min, age_max + 1)
-                # cats[age] = 1
-                # #all_gen_c = [np.concatenate([gen_c_initial[:25], get_age_category(generate_age(age_min, age_max), cats, rmin=age_min, rmax=age_max)]) for gen_c_initial in all_gen_c]
-                # all_gen_c = [np.concatenate([gen_c_initial[:25], cats]) for gen_c_initial in all_gen_c]
+                cats = [0] * 101 
+                age = np.random.randint(age_min, age_max + 1)
+                cats[age] = 1
+                all_gen_c = [np.concatenate([gen_c_initial[:25], cats]) for gen_c_initial in all_gen_c]
             else:
                 all_gen_c = [np.concatenate([gen_c_initial[:-1], generate_age(age_min, age_max)]) for gen_c_initial in all_gen_c]
 

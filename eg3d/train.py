@@ -237,6 +237,7 @@ def parse_comma_separated_list(s):
 @click.option('--alternate_losses', help='Alternate between running age_loss and ID_loss', type=bool, required=False, default=False)
 @click.option('--alternate_after', help='After how many images age_loss/id_loss should train before alternating', type=int, required=False, default=100000)
 @click.option('--initial_age_training', help='For how many images we should initally only train using age_loss', type=int, required=False, default=0)
+@click.option('--crop_before_estimate_ages', help="Whether to crop the images before estimating the age", type=bool, required=False, default=False)
 
 
 def main(**kwargs):
@@ -303,6 +304,7 @@ def main(**kwargs):
     c.loss_kwargs.age_loss_fn = opts.age_loss_fn
     c.freeze = opts.freeze
     c.loss_kwargs.age_version = opts.age_version
+    c.loss_kwargs.crop_before_estimate_ages = opts.crop_before_estimate_ages
     c.loss_kwargs.id_model = opts.id_model
     c.loss_kwargs.age_min = opts.age_min
     c.loss_kwargs.age_max = opts.age_max
