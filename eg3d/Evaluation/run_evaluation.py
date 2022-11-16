@@ -18,6 +18,7 @@ from plot_training_results import plot_setup, compute_figsize
 from train import PythonLiteralOption
 
 from Evaluation.generate_data import generate_data, save_image_folder
+from Evaluation.plot_fancy_age import plot_fancy_age
 from Evaluation.Plots.angles_plot import angles_plot
 from Evaluation.Plots.set_age_plot import set_age_plot
 from Evaluation.Plots.id_similarity_plot import id_plot
@@ -47,6 +48,8 @@ from Evaluation.Plots.truncation_plot import truncation_plot
 @click.option('--make_scatter', help="", required=False, default=True)
 @click.option('--make_id_vs_age', help="", required=False, default=True)
 @click.option('--make_angles', help="", required=False, default=True)
+@click.option('--make_fancy_age', help="", required=False, default=True)
+@click.option('--samples_per_age', help="", required=False, default=20)
 def run_evaluation(
     network_folder: str,
     network: str,
@@ -67,6 +70,8 @@ def run_evaluation(
     make_scatter: bool,
     make_id_vs_age: bool,
     make_angles: bool,
+    make_fancy_age: bool,
+    samples_per_age: int,
     ):
     np.seterr(all="ignore") # ignore numpy warnings
 
@@ -87,7 +92,8 @@ def run_evaluation(
             network_pkl, seed, truncation_psi, truncation_cutoff, 
             angles_plot_iterations, age_model_name, angles_p, angles_y, 
             scatter_iterations, id_plot_iterations, generate_image_folder, 
-            generate_average_face, make_truncation_data, make_id_vs_age)
+            generate_average_face, make_truncation_data, make_id_vs_age,
+            make_fancy_age, samples_per_age)
     
     print("Creating plots...")
     if make_scatter:
@@ -106,6 +112,9 @@ def run_evaluation(
     save_correlation(save_name, network_folder=network_folder)
 
     truncation_plot(network_folder, save_name)
+
+    if make_fancy_age:
+        plot_fancy_age(network_folder, save_name)
     
     print(f"Evaluation completed.\nSee results in Evaluation/Runs/{save_name}")
     
