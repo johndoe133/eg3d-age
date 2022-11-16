@@ -40,13 +40,13 @@ def image_grid(imgs, rows, cols):
 
 def edit_age(image_name, model_path, c):
     old_G, new_G = load_generators(image_name)
-    ages = [age for age in np.linspace(5,75,10)]
+    ages = [age for age in np.linspace(-25,90,10)]
     embedding_dir_w = './PTI/embeddings/w'
     z_pivot = torch.load(f'{embedding_dir_w}/{image_name}.pt')
     images = []
     for age in ages:
         new_c = c
-        new_c[0][-1] = normalize(age)
+        new_c[0][-1] = normalize(age, rmin=hyperparameters.age_min, rmax=hyperparameters.age_max)
         w_pivot = new_G.mapping(z_pivot, c)
         new_image = new_G.synthesis(w_pivot, new_c)['image']
         img = (new_image.permute(0, 2, 3, 1) * 127.5 + 128).clamp(0, 255).to(torch.uint8)[0].cpu().numpy()

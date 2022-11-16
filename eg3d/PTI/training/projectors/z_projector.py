@@ -85,7 +85,11 @@ def project(
     start_z = start_z[None, :] # [1,512]
     z_opt = torch.tensor(start_z, dtype=torch.float32, device=device, requires_grad=True)  # torch.Size([512])
                             # pylint: disable=not-callable
-    optimizer = torch.optim.Adam([z_opt] + list(noise_bufs.values()), betas=(0.9, 0.999),
+    age = c[:,-1].cpu().numpy()
+    age_opt = torch.tensor(age, dtype=torch.float32, device=device, requires_grad=True)
+    P = c[:,:-1]
+    
+    optimizer = torch.optim.Adam([z_opt] + list(noise_bufs.values()) + [age_opt], betas=(0.9, 0.999),
                                     lr=hyperparameters.first_inv_lr)
 
     # Init noise.
@@ -108,6 +112,7 @@ def project(
         # Synth images from opt_w.
         z_noise = torch.randn_like(z_opt) * z_noise_scale
         zs = (z_opt + z_noise) #.repeat([G.backbone.mapping.num_ws, 1])
+        c = torch.cat([P[0], age_opt])[None,:]
         
         ws = G.mapping(zs, c)
         synth_images = G.synthesis(ws, c, noise_mode='const', force_fp32=True)['image'] 
@@ -167,4 +172,4 @@ def project(
 
     G_map_num_ws = G.backbone.mapping.num_ws
     del G
-    return z_opt
+    return z_opt, age_opt

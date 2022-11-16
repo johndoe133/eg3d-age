@@ -39,9 +39,9 @@ def run_PTI(c, image_name, run_name='', use_wandb=False, use_multi_id_training=F
     else:
         coach = SingleIDCoach(c, image_name, dataloader, use_wandb)
 
-    coach.train()
+    age = coach.train()
 
-    return global_config.run_name
+    return global_config.run_name, age
 
 
 if __name__ == '__main__':
