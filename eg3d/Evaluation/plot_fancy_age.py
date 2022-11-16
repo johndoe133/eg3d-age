@@ -43,13 +43,14 @@ def plot_fancy_age(network_folder, save_name):
     plt.xticks(list(range(age_min, age_max + 5, 5)))
     
     
-    plt.scatter(df['target_age'], df['age_difference'], s=10, zorder=20)
+    plt.scatter(df['target_age'], df['age_difference'], s=10, zorder=20, label='age difference')
     plt.plot(df['target_age'], df['age_difference'])
-    plt.fill_between(df['target_age'], df['age_difference'] + df['std'], df['age_difference'] - df['std'], facecolor='blue', alpha=0.4)
+    plt.fill_between(df['target_age'], df['age_difference'] + df['std'], df['age_difference'] - df['std'], facecolor='C0', alpha=0.4, label='std')
     lower, upper = plt.ylim()
     plt.ylim(0, upper)
     plt.xlabel('Target age')
-    plt.ylabel('Age difference')
+    plt.ylabel('Mean age difference')
+    plt.legend()
 
 
     plt.savefig(save_path + f"/{fig_name}" + ".png",bbox_inches='tight')
