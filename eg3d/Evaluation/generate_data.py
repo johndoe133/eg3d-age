@@ -1,3 +1,4 @@
+import shutup; shutup.please() 
 from math import trunc
 import click 
 import json
@@ -22,6 +23,8 @@ from train import PythonLiteralOption
 from torchvision.utils import make_grid
 from training.training_loop import get_age_category
 from Evaluation.average_face import average_face
+from Evaluation.fpage.fpage import FPAge
+import torch.nn.functional as F
 
 def image_grid(imgs, rows, cols):
     #https://stackoverflow.com/questions/37921295/python-pil-image-make-3x3-grid-from-sequence-images
@@ -72,7 +75,7 @@ def generate_data(
         print("Making average faces of different ages...")
         average_face(G, save_name, device, truncation_psi, truncation_cutoff, get_camera_parameters, get_conditioning_parameter, image_grid, network_folder)
     print("Generating age data...")
-    ages = generate_angles_data(G, age_model_name, device, angles_p, angles_y, angles_plot_iterations, save_name, truncation_cutoff, truncation_psi, network_folder)
+    generate_angles_data(G, age_model_name, device, angles_p, angles_y, angles_plot_iterations, save_name, truncation_cutoff, truncation_psi, network_folder)
     print("Generating id data...")
     ages_id = generate_id_data(G, device, id_plot_iterations, save_name, truncation_cutoff, truncation_psi, network_folder)
     print("Generating scatter plot data...")
@@ -81,7 +84,7 @@ def generate_data(
         print("Generating truncation data...")
         generate_truncation_data(G, device, seed, save_name, network_folder)
     print("Generating evaluation image...")
-    generate_image(G, seed, device, network_folder, save_name)
+    generate_image(G, seed, device, network_folder, save_name, truncation_psi)
     if make_fancy_age:
         print('Generating fancy age scatter plot data')
         generate_fancy_age(G, device, seed, save_name, network_folder, age_model_name, truncation_psi, truncation_cutoff, samples_per_age=samples_per_age)
@@ -93,7 +96,7 @@ def generate_data(
 def generate_scatter_data(G, device, seed, save_name, network_folder, truncation_cutoff, truncation_psi, age_model_name, iterations, make_id_vs_age=True):
     ## Age evaluation
     magface = FaceIDLoss(device, model="MagFace")
-
+    FPAge_model = FPAge()
     training_option_path = os.path.join(network_folder, "training_options.json")
     f = open(training_option_path)
     training_option = json.load(f)
@@ -110,8 +113,8 @@ def generate_scatter_data(G, device, seed, save_name, network_folder, truncation
         age_model = AgeEstimatorNew(device, age_min = age_min, age_max=age_max)
 
 
-    angles_p = np.random.RandomState(seed).uniform(-0.5, 0.5, size=(iterations))
-    angles_y = np.random.RandomState(seed+1).uniform(-0.5, 0.5, size=(iterations))
+    # angles_p = np.random.RandomState(seed).uniform(-0.5, 0.5, size=(iterations))
+    # angles_y = np.random.RandomState(seed+1).uniform(-0.5, 0.5, size=(iterations))
     z = torch.from_numpy(np.random.RandomState(seed).randn(iterations, G.z_dim)).to(device)
 
     if age_loss_fn == "CAT":
@@ -140,7 +143,7 @@ def generate_scatter_data(G, device, seed, save_name, network_folder, truncation
     arcface = FaceIDLoss(device, model="ArcFace")
         
     cosine_sim_f = torch.nn.CosineSimilarity()
-    for zi, age, age_2, angle_p, angle_y in tqdm(zip(z, ages, ages_2, angles_p, angles_y), total=iterations):
+    for zi, age, age_2, angle_p, angle_y in tqdm(zip(z, ages, ages_2, [0]*iterations, [0]*iterations), total=iterations): #frontal view
         cam2world_pose = LookAtPoseSampler.sample(np.pi/2 + angle_y, np.pi/2 + angle_p, cam_pivot, radius=cam_radius, device=device)
         conditioning_cam2world_pose = LookAtPoseSampler.sample(np.pi/2, np.pi/2, cam_pivot, radius=cam_radius, device=device)
         camera_params = torch.cat([cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)
@@ -149,16 +152,16 @@ def generate_scatter_data(G, device, seed, save_name, network_folder, truncation
         c_params = torch.cat((camera_params, torch.tensor(np.array([age]), device=device)), 1).float()
         ws = G.mapping(zi[None,:], c, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff)
         img = G.synthesis(ws, c_params)['image']
-        age_hat, logits = age_model.estimate_age(img)
-
+        age_hat, _ = age_model.estimate_age(img)
+        age_hat2 = FPAge_model.estimate_age(img)
 
         # same person, diff age
         if make_id_vs_age:
-            c_params_2 = torch.cat((camera_params, torch.tensor([age_2], device=device)), 1).float()
-            c_2 = torch.cat((conditioning_params, torch.tensor([age_2], device=device)), 1)
+            c_params_2 = torch.cat((camera_params, torch.tensor(np.array([age_2]), device=device)), 1).float()
+            c_2 = torch.cat((conditioning_params, torch.tensor(np.array([age_2]), device=device)), 1)
             ws_2 = G.mapping(zi[None,:], c_2, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff)
             img_2 = G.synthesis(ws_2, c_params_2)['image']
-            age_hat_2, logits_2 = age_model.estimate_age(img_2)
+            # age_hat_2, logits_2 = age_model.estimate_age(img_2)
         
             v1 = id_model.get_feature_vector(img)
             v2 = id_model.get_feature_vector(img_2)
@@ -174,14 +177,14 @@ def generate_scatter_data(G, device, seed, save_name, network_folder, truncation
         elif age_loss_fn =="MSE":
             age_true = age[0]
         if make_id_vs_age:
-            res.append([age_hat.item(), age_true, angle_p, angle_y, mag, cos_sim.item(), age_diff[0]])
+            res.append([age_hat.item(), age_hat2, age_true, angle_p, angle_y, mag, cos_sim.item(), age_diff[0]])
         else:
-            res.append([age_hat.item(), age_true, angle_p, angle_y, mag])
+            res.append([age_hat.item(), age_hat2, age_true, angle_p, angle_y, mag])
 
     if make_id_vs_age:
-        columns = ["age_hat", "age_true", "angle_p", "angle_y", "mag", "cos_sim", "age_diff"]
+        columns = ["age_hat", "age_hat2", "age_true", "angle_p", "angle_y", "mag", "cos_sim", "age_diff"]
     else:
-        columns = ["age_hat", "age_true", "angle_p", "angle_y", "mag"]
+        columns = ["age_hat", "age_hat2", "age_true", "angle_p", "angle_y", "mag"]
 
     df = pd.DataFrame(res, columns=columns)
     # Save as csv file
@@ -192,9 +195,9 @@ def generate_scatter_data(G, device, seed, save_name, network_folder, truncation
     df.to_csv(save_path, index=False)   
 
 def generate_id_data(
-        G, device, angles_plot_iterations, save_name, truncation_cutoff, truncation_psi, network_folder
+        G, device, id_plot_iterations, save_name, truncation_cutoff, truncation_psi, network_folder
     ):
-    seeds = np.random.randint(1,100000, size = angles_plot_iterations)
+    seeds = np.random.randint(1,100000, size = id_plot_iterations)
 
     training_option_path = os.path.join(network_folder, "training_options.json")
     f = open(training_option_path)
@@ -213,8 +216,8 @@ def generate_id_data(
     res = []
     for seed in tqdm(seeds):
         for age1 in ages:
-            angle_y = np.random.uniform(-0.5,0.5)
-            angle_p = np.random.uniform(-0.5,0.5)
+            angle_y = 0 # frontal view !np.random.uniform(-0.5,0.5)
+            angle_p = 0 # frontal view !np.random.uniform(-0.5,0.5)
             z = torch.from_numpy(np.random.RandomState(seed).randn(1, G.z_dim)).to(device)
             c = get_conditioning_parameter(age1, G, device, age_loss_fn, age_min, age_max)
             c_camera = get_camera_parameters(age1, G, device, angle_y, angle_p, age_loss_fn, age_min, age_max)
@@ -224,7 +227,7 @@ def generate_id_data(
             feature_v_1_arcface = arcface.get_feature_vector_arcface(generated_image_1)
             for age2 in ages:
                 if age1 == age2:
-                    continue # skip comparing similar images
+                    pass # skip comparing similar images
                 c = get_conditioning_parameter(age2, G, device, age_loss_fn, age_min, age_max)
                 c_camera = get_camera_parameters(age2, G, device, angle_y, angle_p, age_loss_fn, age_min, age_max)
                 ws = G.mapping(z, c, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff)
@@ -261,9 +264,9 @@ def generate_angles_data(G, age_model_name, device, angles_p, angles_y, angles_p
         truncation_cutoff (_type_): _description_
         truncation_psi (_type_): _description_
         network_folder (_type_): _description_
+        C3AE_model
     """
     seeds = np.random.randint(1,100000, size = angles_plot_iterations)
-
     training_option_path = os.path.join(network_folder, "training_options.json")
     f = open(training_option_path)
     training_option = json.load(f)
@@ -271,38 +274,39 @@ def generate_angles_data(G, age_model_name, device, angles_p, angles_y, angles_p
     age_min = training_option['age_min']
     age_max = training_option['age_max']
     age_loss_fn = training_option['age_loss_fn']
-    ## Age evaluation
-    if age_model_name == 'coral':
-        age_model = Coral()
-    elif age_model_name == 'v1':
-        age_model = AgeEstimator()
-    elif age_model_name == 'v2':
-        age_model = AgeEstimatorNew(device, age_min=age_min, age_max=age_max)
-
-    ages = list(map(int, np.linspace(age_min, age_max, 9))) # 9 to fit a 3x3 grid
+    magface = FaceIDLoss(device, model="MagFace")
+    res = []
+    batch_size = 8
+    iterations_per_batch = 4
+    n = 400
+    iterations = n // batch_size
+    # cs = []; cs_cameras = []; ages = []; angles_y = []; angles_p = []
     angles = []
-    for angle_p in angles_p:
-        for angle_y in angles_y:
-            angles.append((angle_y, angle_p))
-        res = []
-    for seed in tqdm(seeds):
-        z = torch.from_numpy(np.random.RandomState(seed).randn(1, G.z_dim)).to(device)
-        for age in ages:
-            c = get_conditioning_parameter(age, G, device, age_loss_fn, age_min, age_max)
-            for angle_y, angle_p in angles:
-                c_camera = get_camera_parameters(age, G, device, angle_y, angle_p, age_loss_fn, age_min, age_max)
-                ws = G.mapping(z, c, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff)
-                generated_image =  G.synthesis(ws, c_camera)['image']
-                age_hat, logits = age_model.estimate_age(generated_image)
-                if age_model_name in ["v1", "v2"]:
-                    age_hat = denormalize(age_hat, rmin=age_min, rmax=age_max)
-                age_hat = age_hat.item()
-                mae = np.abs(age - age_hat)
-                error = age-age_hat
-                res.append([seed, age, angle_y, angle_p, age_hat, mae, error])
-    
+    for angle_p in np.linspace(-0.8,0.8,9):
+        for angle_y in np.linspace(-0.8,0.8,9):
+            angles.append((angle_p, angle_y))
+    for angle in tqdm(angles):
+        for i in range(iterations_per_batch):
+            z = torch.from_numpy(np.random.randn(batch_size, G.z_dim)).to(device)
+            cs = []; cs_cameras = []; ages = []; angles_y = []; angles_p = []
+            for i in range(batch_size):
+                age = np.random.randint(age_min, age_max + 1)
+                ages.append(age)
+                angle_p, angle_y = angle
+                angles_y.append(angle_y)
+                angles_p.append(angle_p)
+                cs.append(get_conditioning_parameter(age, G, device, age_loss_fn, age_min, age_max)[0])
+                cs_cameras.append(get_camera_parameters(age, G, device, angle_y, angle_p, age_loss_fn, age_min, age_max)[0])
+            c = torch.stack(cs)
+            c_camera = torch.stack(cs_cameras)
+            ws = G.mapping(z, c, truncation_psi=truncation_psi, truncation_cutoff=14)
+            generated_image =  G.synthesis(ws, c_camera)['image']
+            features =  magface.get_feature_vector(generated_image)
+            mag = np.linalg.norm(features.cpu().numpy(), axis=1)
+            for i in range(batch_size):
+                res.append([ages[i], angles_y[i], angles_p[i], mag[i]])
     # create dataframe
-    columns = ["seed", "age", "angle_y", "angle_p", "age_hat", "mae", "error"]
+    columns = ["age", "angle_y", "angle_p", "magface"]
     df = pd.DataFrame(res, columns=columns)
 
     # Save as csv file
@@ -311,9 +315,9 @@ def generate_angles_data(G, age_model_name, device, angles_p, angles_y, angles_p
     save_path = os.path.join(save_dir,f"age_evaluation.csv")
     print("Saving csv at", save_dir,"...")
     df.to_csv(save_path, index=False)
-    return ages
 
-def generate_image(G, seed, device, path, save_name):
+def generate_image(G, seed, device, path, save_name, truncation_psi):
+    magface = FaceIDLoss(device, model="MagFace")
     training_option_path = os.path.join(path, "training_options.json")
     f = open(training_option_path)
     training_option = json.load(f)
@@ -321,14 +325,12 @@ def generate_image(G, seed, device, path, save_name):
     age_loss_fn = training_option['age_loss_fn']
     age_min = training_option['age_min']
     age_max = training_option['age_max']
-
     angles_y = [0.5, 0, -0.5]
     angles_p = [0.5, 0.25, 0, -0.25, -0.5]
     fov_deg = 18.837
 
     intrinsics = FOV_to_intrinsics(fov_deg, device=device)
 
-    truncation_psi=1
     truncation_cutoff=14
     font = ImageFont.truetype("FreeSerif.ttf", 72)
     text_color="#FFFFFF"
@@ -367,11 +369,162 @@ def generate_image(G, seed, device, path, save_name):
 
     save_dir = os.path.join("Evaluation","Runs", save_name)
     os.makedirs(save_dir, exist_ok=True)
-    save_path = os.path.join(save_dir, "image.png")
+    save_path = os.path.join(save_dir, "image_random_age_set_angles.png")
     print("Saving image at", save_dir,"...")
 
     grid = image_grid(images, rows=len(angles_p), cols = images_per_angle*len(angles_y))
     grid.save(save_path)
+
+    ## Image of linearly spread ages
+    images = []
+    ages = np.linspace(age_min, age_max, 8).round(0)
+    #frontal view
+    cam2world_pose = LookAtPoseSampler.sample(np.pi/2 + 0, np.pi/2 + 0, cam_pivot, radius=cam_radius, device=device)
+    conditioning_cam2world_pose = LookAtPoseSampler.sample(np.pi/2, np.pi/2, cam_pivot, radius=cam_radius, device=device)
+    camera_params = torch.cat([cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)
+    conditioning_params = torch.cat([conditioning_cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1) 
+    for age_g in ages:
+        z = torch.from_numpy(np.random.randn(1, G.z_dim)).to(device)
+        if age_loss_fn == "CAT":
+            age = [0] * 101
+            age[age_g] = 1
+        elif age_loss_fn == "MSE":
+            age = [normalize(age_g, rmin=age_min, rmax=age_max)]
+
+        c = torch.cat((conditioning_params, torch.tensor(np.array([age]), device=device)), 1)
+        c_params = torch.cat((camera_params, torch.tensor(np.array([age]), device=device)), 1).float()
+
+        ws = G.mapping(z, c, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff)
+        img = G.synthesis(ws, c_params)['image']
+        features =  magface.get_feature_vector(img)
+        mag = np.linalg.norm(features.cpu().numpy(), axis=1)
+        img = (img * 127.5 + 128).clamp(0, 255).to(torch.uint8)
+
+        pil_img = Image.fromarray(img.permute(0,2,3,1)[0].cpu().numpy(), 'RGB')
+        text_added = ImageDraw.Draw(pil_img)
+        
+        text_added.text((0,420), f"Age: {age_g} + {int(mag[0])}", font=font, fill=text_color)
+        images.append(pil_img)
+
+    save_dir = os.path.join("Evaluation","Runs", save_name)
+    os.makedirs(save_dir, exist_ok=True)
+    save_path = os.path.join(save_dir, "image_ages_frontal.png")
+    print("Saving image at", save_dir,"...")
+
+    grid = image_grid(images, rows = 2, cols = 4)
+    grid.save(save_path)
+
+    ### many images in one grid
+    images=[]
+    rows = 10
+    columns = 8
+
+    for i in range(int(rows * columns)):
+        z = torch.from_numpy(np.random.randn(1, G.z_dim)).to(device)
+        age = [np.random.uniform(-1,1)]
+        c = torch.cat((conditioning_params, torch.tensor(np.array([age]), device=device)), 1)
+        c_params = torch.cat((camera_params, torch.tensor(np.array([age]), device=device)), 1).float()
+
+        ws = G.mapping(z, c, truncation_psi=1, truncation_cutoff=truncation_cutoff)
+        img = G.synthesis(ws, c_params)['image']
+        img = (img * 127.5 + 128).clamp(0, 255)
+        img = F.interpolate(img.float(), [150,150],  mode='bilinear', align_corners=True).to(torch.uint8)
+        pil_img = Image.fromarray(img.permute(0,2,3,1)[0].cpu().numpy(), 'RGB')
+        images.append(pil_img)
+        
+    save_path = os.path.join(save_dir, "image_many.png")
+    print("Saving image at", save_dir,"...")
+
+    grid = image_grid(images, rows = rows, cols = columns)
+    grid.save(save_path)
+
+    # used for evaluating magface score
+    # font = ImageFont.truetype("FreeSerif.ttf", 40) 
+    # # <400, 400-500, 500-600, 600-700, 700-800, 800-900, 900-1000, >1000
+    # magface_buckets = [False] * 8
+    # images = [0] * 8
+    # while True:
+    #     if sum(magface_buckets) == 8:
+    #         break
+    #     age_g = np.random.randint(age_min, age_max + 1)
+    #     if age_loss_fn == "CAT":
+    #         age = [0] * 101
+    #         age[age_g] = 1
+    #     elif age_loss_fn == "MSE":
+    #         age = [normalize(age_g, rmin=age_min, rmax=age_max)]
+    #     z = torch.from_numpy(np.random.randn(1, G.z_dim)).to(device)
+    #     c = torch.cat((conditioning_params, torch.tensor(np.array([age]), device=device)), 1)
+    #     c_params = torch.cat((camera_params, torch.tensor(np.array([age]), device=device)), 1).float()
+    #     ws = G.mapping(z, c, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff)
+    #     img = G.synthesis(ws, c_params)['image']
+
+    #     features =  magface.get_feature_vector(img)
+    #     mag = np.linalg.norm(features.cpu().numpy(), axis=1)
+        
+    #     if (mag < 400):
+    #         if (not magface_buckets[0]):
+    #             magface_buckets[0] = True
+    #             i = 0
+    #         else:
+    #             continue
+    #     elif (mag < 500):
+    #         if (not magface_buckets[1]):
+    #             magface_buckets[1] = True
+    #             i = 1
+    #         else:
+    #             continue
+    #     elif (mag < 600):
+    #         if (not magface_buckets[2]):
+    #             magface_buckets[2] = True
+    #             i = 2
+    #         else:
+    #             continue
+    #     elif (mag < 700):
+    #         if (not magface_buckets[3]):
+    #             magface_buckets[3] = True
+    #             i =3
+    #         else:
+    #             continue
+    #     elif (mag < 800):
+    #         if (not magface_buckets[4]):
+    #             magface_buckets[4] = True
+    #             i = 4
+    #         else:
+    #             continue
+    #     elif (mag < 900):
+    #         if (not magface_buckets[5]):
+    #             magface_buckets[5] = True
+    #             i = 5
+    #         else:
+    #             continue
+    #     elif (mag < 1000):
+    #         if (not magface_buckets[6]):
+    #             magface_buckets[6] = True
+    #             i = 6
+    #         else:
+    #             continue
+    #     elif (mag >= 1000):
+    #         if (not magface_buckets[7]):
+    #             magface_buckets[7] = True
+    #             i = 7
+    #         else:
+    #             continue
+        
+
+    #     img = (img * 127.5 + 128).clamp(0, 255).to(torch.uint8)
+    #     pil_img = Image.fromarray(img.permute(0,2,3,1)[0].cpu().numpy(), 'RGB')
+    #     text_added = ImageDraw.Draw(pil_img)
+
+    #     text_added.text((0,512-45), f"Magface score: {int(mag[0])}", font=font, fill=text_color)
+    #     images[i] = pil_img
+
+    # save_dir = os.path.join("Evaluation","Runs", save_name)
+    # os.makedirs(save_dir, exist_ok=True)
+    # save_path = os.path.join(save_dir, "image_magface.png")
+    # print("Saving image at", save_dir,"...")
+
+    # grid = image_grid(images, rows = 2, cols = 4)
+    # grid.save(save_path)
 
 def generate_fancy_age(G, device, seed, save_name, network_folder, age_model_name, truncation_psi, truncation_cutoff, samples_per_age=20):
     training_option_path = os.path.join(network_folder, "training_options.json")
@@ -381,7 +534,7 @@ def generate_fancy_age(G, device, seed, save_name, network_folder, age_model_nam
     age_loss_fn = training_option['age_loss_fn']
     age_min = training_option['age_min']
     age_max = training_option['age_max']
-
+    FPAge_model = FPAge()
     if age_model_name == 'coral':
         age_model = Coral()
     elif age_model_name == 'v1':
@@ -392,7 +545,7 @@ def generate_fancy_age(G, device, seed, save_name, network_folder, age_model_nam
     fov_deg = 18.837
     intrinsics = FOV_to_intrinsics(fov_deg, device=device)
 
-    angle_y, angle_p = (0, 0)
+    angle_y, angle_p = (0, 0) #frontal view
     cam_pivot = torch.tensor(G.rendering_kwargs.get('avg_camera_pivot', [0, 0, 0]), device=device)
     cam_radius = G.rendering_kwargs.get('avg_camera_radius', 2.7)
     cam2world_pose = LookAtPoseSampler.sample(np.pi/2 + angle_y, np.pi/2 + angle_p, cam_pivot, radius=cam_radius, device=device)
@@ -409,16 +562,19 @@ def generate_fancy_age(G, device, seed, save_name, network_folder, age_model_nam
         c_params = torch.cat((camera_params, torch.tensor([[norm_age]], device=device)), 1)
         c_params = c_params.float()
         zs = torch.from_numpy(np.random.RandomState(seed + i).randn(samples_per_age, G.z_dim)).to(device)
-        age_hats = []
+        age_hats = []; age_hats_fpage = []
         for z in zs:
             ws = G.mapping(z[None,:], c, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff)
             img = G.synthesis(ws, c_params)['image']
-            age_hat, logits = age_model.estimate_age(img, normalize=False)
+            age_hat, _ = age_model.estimate_age(img, normalize=False)
+            age_hat_fpage = FPAge_model.estimate_age(img)
             age_hats += [age_hat.item()]
+            age_hats_fpage.append(age_hat_fpage)
         age_hats = np.array(age_hats)
-        res.append([age, np.mean(np.abs(age_hats - age)), np.std(np.abs(age_hats) - age)])
+        age_hats_fpage = np.array(age_hats_fpage)
+        res.append([age, np.mean(np.abs(age_hats - age)), np.std(np.abs(age_hats) - age), np.mean(np.abs(age_hats_fpage - age)), np.std(np.abs(age_hats_fpage) - age)])
 
-    df = pd.DataFrame(res, columns=['target_age', 'age_difference', 'std'])
+    df = pd.DataFrame(res, columns=['target_age', 'age_difference', 'std', 'age_difference_fpage', 'std_fpage'])
 
     save_dir = os.path.join("Evaluation", "Runs", save_name)
     os.makedirs(save_dir, exist_ok=True)
@@ -546,11 +702,10 @@ def save_image_folder(save_name, network_folder, G, device, truncation_cutoff, t
     age_loss_fn = training_option['age_loss_fn']
     age_min = training_option['age_min']
     age_max = training_option['age_max']
-    number_of_images = 100
-    angles_p = np.random.RandomState(seed).uniform(-0.5, 0.5, size=(number_of_images)).round(4)
-    angles_y = np.random.RandomState(seed+1).uniform(-0.5, 0.5, size=(number_of_images)).round(4)
+    number_of_images = 400
+    
     z = torch.from_numpy(np.random.RandomState(seed).randn(number_of_images, G.z_dim)).to(device)
-
+    magface = FaceIDLoss(device, model="MagFace")
     # if age_loss_fn == "CAT":
     #     categories = 101
     #     ages = np.zeros((iterations, categories))
@@ -567,20 +722,7 @@ def save_image_folder(save_name, network_folder, G, device, truncation_cutoff, t
     folder = os.path.join("Evaluation/Runs", save_name, "random_angles")
     os.makedirs(folder, exist_ok=True)
 
-    for zi, age, angle_p, angle_y in tqdm(zip(z, ages, angles_p, angles_y), total=number_of_images):
-        cam2world_pose = LookAtPoseSampler.sample(np.pi/2 + angle_y, np.pi/2 + angle_p, cam_pivot, radius=cam_radius, device=device)
-        conditioning_cam2world_pose = LookAtPoseSampler.sample(np.pi/2, np.pi/2, cam_pivot, radius=cam_radius, device=device)
-        camera_params = torch.cat([cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)
-        conditioning_params = torch.cat([conditioning_cam2world_pose.reshape(-1, 16), intrinsics.reshape(-1, 9)], 1)    
-        c = torch.cat((conditioning_params, torch.tensor(np.array([age]), device=device)), 1)
-        c_params = torch.cat((camera_params, torch.tensor(np.array([age]), device=device)), 1).float()
-
-        ws = G.mapping(zi[None,:], c, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff)
-        img = G.synthesis(ws, c_params)['image']
-        img = (img.permute(0, 2, 3, 1) * 127.5 + 128).clamp(0, 255).to(torch.uint8)
-        image_name = f"{denormalize(age, rmin=age_min, rmax=age_max).round(2)[0]}-{angle_p}-{angle_y}--{truncation_psi}".replace(".",",")
-        pil_img = Image.fromarray(img[0].detach().cpu().numpy(), 'RGB')
-        pil_img.save(os.path.join(folder, image_name) + ".png")
+    age_model = AgeEstimatorNew(device, age_min = age_min, age_max=age_max)
 
     folder = os.path.join("Evaluation/Runs", save_name, "no_angles")
     os.makedirs(folder, exist_ok=True)
@@ -596,8 +738,11 @@ def save_image_folder(save_name, network_folder, G, device, truncation_cutoff, t
 
         ws = G.mapping(zi[None,:], c, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff)
         img = G.synthesis(ws, c_params)['image']
+        age_hat,_ = age_model.estimate_age(img, normalize=False)
+        f = magface.get_feature_vector(img)
+        mag = np.linalg.norm(f.cpu().numpy())
         img = (img.permute(0, 2, 3, 1) * 127.5 + 128).clamp(0, 255).to(torch.uint8)
-        image_name = f"{denormalize(age, rmin=age_min, rmax=age_max).round(2)[0]}".replace(".",",")
+        image_name = f"{denormalize(age, rmin=age_min, rmax=age_max).round(2)[0]}-{round(age_hat.item(),1)}-{truncation_psi}-{mag.round(1)}".replace(".",",")
         pil_img = Image.fromarray(img[0].detach().cpu().numpy(), 'RGB')
         pil_img.save(os.path.join(folder, image_name) + ".png")
 

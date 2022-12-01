@@ -18,7 +18,7 @@ from plot_training_results import plot_setup, compute_figsize
 from train import PythonLiteralOption
 
 from Evaluation.generate_data import generate_data, save_image_folder
-from Evaluation.plot_fancy_age import plot_fancy_age
+from Evaluation.Plots.plot_fancy_age import plot_fancy_age
 from Evaluation.Plots.angles_plot import angles_plot
 from Evaluation.Plots.set_age_plot import set_age_plot
 from Evaluation.Plots.id_similarity_plot import id_plot
@@ -31,10 +31,10 @@ from Evaluation.Plots.truncation_plot import truncation_plot
 @click.command()
 @click.option('--network_folder', help='Network folder name', required=True)
 @click.option('--network', help='Network folder name', default=None, required=False)
-@click.option('--seed', help='Seed to generate from', default=42, required=False, type=int)
+@click.option('--seed', help='Seed to generate from', default=50, required=False, type=int)
 @click.option('--trunc', 'truncation_psi', type=float, help='Truncation psi', default=1, show_default=True)
 @click.option('--trunc-cutoff', 'truncation_cutoff', type=int, help='Truncation cutoff', default=14, show_default=True)
-@click.option('--angles_plot_iterations', help='Number of random seeds to generate synthetic images from when making the angles plot', default=10, type=int)
+@click.option('--angles_plot_iterations', help='Number of random seeds to generate synthetic images from when making the angles plot', default=200, type=int)
 @click.option('--id_plot_iterations', help='Number of random seeds to generate synthetic images from when making the id plot', default=10, type=int)
 @click.option('--age_model_name', help='Age model used', default="DEX", type=str)
 @click.option('--angles_p', help='', cls=PythonLiteralOption, required=False, default="[0.4, 0, -0.4]")

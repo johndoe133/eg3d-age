@@ -11,13 +11,15 @@ def save_correlation(scatter_data, file_name='numbers.csv', network_folder=None)
     ages_df = pd.read_csv(scatter_path)
     age_true = np.array(ages_df['age_true'])
     age_hat = np.array(ages_df['age_hat'])
+    age_hat_fpage = np.array(ages_df['age_hat2'])
     mag = np.array(ages_df['mag'])
-    columns = ['type']
+    columns = ['yu4u', 'FPAge']
 
     rows = ['correlation', 'corr_p_val', 'mae', 'num_samples', 'std', 'cs5', 'cs10', 'cs15', 'mag_corr', 'mag_p_val']
 
-    corr = pearsonr(age_true, age_hat)
-    
+    corr_yu4u = pearsonr(age_true, age_hat)
+    corr_fpage = pearsonr(age_true, age_hat_fpage)
+
     age_min = 0
     age_max=75
     if network_folder:
@@ -29,18 +31,30 @@ def save_correlation(scatter_data, file_name='numbers.csv', network_folder=None)
         age_max = training_option['age_max']
     age_true_unnormalized = normalize(age_true, rmin=-1, rmax=1, tmin=age_min, tmax=age_max)
     age_hat_unnormalized = normalize(age_hat, rmin=-1, rmax=1, tmin=age_min, tmax=age_max)
-    error = np.abs(age_true_unnormalized - age_hat_unnormalized)
-    mae = np.mean(error)
-    std = np.std(error)
+    error_yu4u = np.abs(age_true_unnormalized - age_hat_unnormalized)
+    error_fpage = np.abs(age_true_unnormalized - age_hat_fpage)
+    mae_yu4u = np.mean(error_yu4u)
+    mae_fpage = np.mean(error_fpage)
+    std_yu4u = np.std(error_yu4u)
+    std_fpage = np.std(error_fpage)
     n_samples = len(age_true)
 
-    cs5 = np.sum(error > 5) / n_samples
-    cs10 = np.sum(error > 10) / n_samples
-    cs15 = np.sum(error > 15) / n_samples
+    cs5_yu4u = np.sum(error_yu4u > 5) / n_samples
+    cs10_yu4u = np.sum(error_yu4u > 10) / n_samples
+    cs15_yu4u = np.sum(error_yu4u > 15) / n_samples
+    cs5_fpage = np.sum(error_fpage > 5) / n_samples
+    cs10_fpage = np.sum(error_fpage > 10) / n_samples
+    cs15_fpage = np.sum(error_fpage > 15) / n_samples
 
-    error_mag_corr = pearsonr(error, mag)
+    error_mag_corr_yu4u = pearsonr(error_yu4u, mag)
+    error_mag_corr_fpage = pearsonr(error_fpage, mag)
 
-    data = [[corr[0]], [corr[1]], [mae],[n_samples],  [std],  [cs5], [cs10], [cs15], [error_mag_corr[0]], [error_mag_corr[1]]]
+    data = [
+            [corr_yu4u[0],corr_fpage[0]], [corr_yu4u[1],corr_fpage[1]], [mae_yu4u,mae_fpage],
+            [n_samples, n_samples],  [std_yu4u,std_fpage],  [cs5_yu4u,cs5_fpage], [cs10_yu4u,cs10_fpage], 
+            [cs15_yu4u, cs15_fpage], [error_mag_corr_yu4u[0], error_mag_corr_yu4u[0]], 
+            [error_mag_corr_yu4u[1],error_mag_corr_fpage[1]]
+            ]
 
 
     df = pd.DataFrame(data, columns=columns)
