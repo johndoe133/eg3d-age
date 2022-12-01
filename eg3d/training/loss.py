@@ -41,7 +41,7 @@ class StyleGAN2Loss(Loss):
                     neural_rendering_resolution_fade_kimg=0, gpc_reg_fade_kimg=1000, gpc_reg_prob=None, 
                     dual_discrimination=False, filter_mode='antialiased', age_version='v2', 
                     age_min=0, age_max=100, id_model="FaceNet", alternate_losses=False, alternate_after=100000,
-                    initial_age_training=0, age_loss_fn = "MSE", crop_before_estimate_ages=False):
+                    initial_age_training=0, age_loss_fn = "MSE", crop_before_estimate_ages=False, description=""):
         super().__init__()
         self.device             = device
         self.G                  = G
@@ -117,7 +117,7 @@ class StyleGAN2Loss(Loss):
             tensor: loss
         """
         images = imgs['image']
-        predicted_ages, logits = self.age_model.estimate_age(images.clone())
+        predicted_ages, logits = self.age_model.estimate_age(images)
         predicted_ages = predicted_ages.to(self.device)
         if loss_fn == "MSE":
             ages = c[:,-1].clone()

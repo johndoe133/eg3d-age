@@ -27,7 +27,7 @@ class AgeEstimatorNew():
             age_max (int, optional): In what range the denormalization is done. Defaults to 100.
             crop (bool, optional): Whether to crop the images as the author. Tests show little to no difference in outcome. Defaults to False.
     """
-    def __init__(self, device, age_min=0, age_max=100, crop=False):
+    def __init__(self, device, age_min=0, age_max=75, crop=False):
         root = os.path.expanduser('~')
         model = get_model(model_name=cfg.MODEL.ARCH, pretrained=None)
         self.age_model = model.to(device)

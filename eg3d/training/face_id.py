@@ -13,7 +13,10 @@ from networks.MagFace.iresnet import iresnet100, iresnet50
 from training.mtcnn import MTCNN
 from skimage import transform as trans
 from kornia.geometry import warp_affine
-import insightface 
+try:
+    import insightface 
+except:
+    print("Didnt import insightface")
 from easydict import EasyDict
 import onnxruntime as ort
 ort.set_default_logger_severity(3)

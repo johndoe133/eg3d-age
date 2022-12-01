@@ -238,7 +238,7 @@ def parse_comma_separated_list(s):
 @click.option('--alternate_after', help='After how many images age_loss/id_loss should train before alternating', type=int, required=False, default=100000)
 @click.option('--initial_age_training', help='For how many images we should initally only train using age_loss', type=int, required=False, default=0)
 @click.option('--crop_before_estimate_ages', help="Whether to crop the images before estimating the age", type=bool, required=False, default=False)
-
+@click.option('--description', help="Decsription of the job - not effect on training", required=False, default="")
 
 def main(**kwargs):
     """Train a GAN using the techniques described in the paper
@@ -310,6 +310,7 @@ def main(**kwargs):
     c.loss_kwargs.age_max = opts.age_max
     c.age_min = opts.age_min
     c.age_max = opts.age_max
+    c.description = opts.description
     c.loss_kwargs.alternate_losses = opts.alternate_losses
     c.loss_kwargs.alternate_after = opts.alternate_after
     c.loss_kwargs.initial_age_training = opts.initial_age_training

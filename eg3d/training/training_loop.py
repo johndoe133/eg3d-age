@@ -241,11 +241,17 @@ def training_loop(
     age_version             = 'v2',     # Which version of the age estimator to use
     age_min                 = 0,        # Minimum age generated for training
     age_max                 = 100,      # Maximum age generated for training
+    description             = '',       # Text description of the job
 ):
     # Initialize.
     start_time = time.time()
     device = torch.device('cuda', rank)
+
+    torch.cuda.set_device(rank)
+    torch.cuda.empty_cache()
+
     np.random.seed(random_seed * num_gpus + rank)
+    torch.cuda.set_device(device)
     torch.manual_seed(random_seed * num_gpus + rank)
     torch.backends.cudnn.benchmark = cudnn_benchmark    # Improves training speed.
     torch.backends.cuda.matmul.allow_tf32 = False       # Improves numerical accuracy.
@@ -276,6 +282,9 @@ def training_loop(
     D = dnnlib.util.construct_class_by_name(**D_kwargs, **common_kwargs).train().requires_grad_(False).to(device) # subclass of torch.nn.Module
     G_ema = copy.deepcopy(G).eval()
 
+    if rank==0:
+        print("Description of job:")
+        print(description)
     # Print commit sha
     if rank ==0:
         try:
