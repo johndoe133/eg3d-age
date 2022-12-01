@@ -4,6 +4,7 @@ import pandas as pd
 import os 
 from sklearn.neighbors import KernelDensity
 import numpy as np
+from sklearn.preprocessing import StandardScaler
 
 def id_plot(save_path):
     plot_setup()
@@ -60,35 +61,51 @@ def id_plot(save_path):
     fig_name = "id.png"
     plt.savefig(save_path + f"/{fig_name}")
     print(f"Figure {fig_name} save at {save_path}")  
+
+    # second id plot
+    # scaling
+    scaler = StandardScaler()
+    cosine_sim = df.cosine_sim.to_numpy()
+    cosine_sim_arcface = df.cosine_sim_arcface.to_numpy()
+
+    scaler.fit(cosine_sim.reshape(-1,1))
+    cosine_sim_transformed = scaler.transform(cosine_sim.reshape(-1,1))
+    df['cosine_sim_transformed'] = cosine_sim_transformed.reshape(-1)
+
+    scaler.fit(cosine_sim_arcface.reshape(-1,1))
+    cosine_sim_arcface_transformed = scaler.transform(cosine_sim_arcface.reshape(-1,1))
+    df['cosine_sim_arcface_transformed'] = cosine_sim_arcface_transformed.reshape(-1)
+
     training_id_model = df.id_train.iloc[0]
+
     fig, axs = plt.subplots(len(ages), 1, sharey=False, sharex=True, figsize = figsize, dpi=300)
     df_grouped = df.groupby(["age1","age2"]).mean().reset_index()
     df_grouped_std = df.groupby(["age1","age2"]).std().reset_index()
     for i, age1 in enumerate(ages):
-        cosine_sim = df_grouped[df_grouped.age1 == age1].cosine_sim.to_list()
-        std = df_grouped_std[df_grouped_std.age1 == age1].cosine_sim.to_list()
+        cosine_sim = df_grouped[df_grouped.age1 == age1].cosine_sim_transformed.to_list()
+        std = df_grouped_std[df_grouped_std.age1 == age1].cosine_sim_transformed.to_list()
         x = df_grouped[df_grouped.age1 == age1].age2.to_list()
 
-        x.insert(i, age1)
+        # x.insert(i, age1)
+        cosine_sim_arcface = df_grouped[df_grouped.age1 == age1].cosine_sim_arcface_transformed.to_list()
+        std_arcface = df_grouped_std[df_grouped_std.age1 == age1].cosine_sim_arcface_transformed.to_list()
         
-        cosine_sim_arcface = df_grouped[df_grouped.age1 == age1].cosine_sim_arcface.to_list()
-        std_arcface = df_grouped_std[df_grouped_std.age1 == age1].cosine_sim_arcface.to_list()
-        
-        cosine_sim.insert(i,1)
-        std.insert(i,0)
-
-        cosine_sim_arcface.insert(i,1)
-        std_arcface.insert(i,0)
+        # cosine_sim.insert(i,1)
+        # std.insert(i,0)
+        # std[i] = 0
+        # cosine_sim_arcface.insert(i,1)
+        # std_arcface.insert(i,0)
+        # std_arcface[i]=0
 
         x, cosine_sim, std, cosine_sim_arcface, std_arcface = np.array(x), np.array(cosine_sim), np.array(std), np.array(cosine_sim_arcface), np.array(std_arcface)
 
         axs[i].scatter(x, cosine_sim, s=15, zorder=20, label=training_id_model)
         axs[i].plot(x, cosine_sim, color="black", alpha=0.6, zorder=1)
-        axs[i].fill_between(x, cosine_sim - std, cosine_sim + std, alpha=0.4, label="std", color="C0")
+        axs[i].fill_between(x, cosine_sim - std, cosine_sim + std, alpha=0.4, label="std", facecolor="C0")
         
         axs[i].scatter(x, cosine_sim_arcface, s=15, zorder=15, label="ArcFace")
         axs[i].plot(x, cosine_sim_arcface, color="black", alpha=0.6, zorder=1)
-        axs[i].fill_between(x, cosine_sim_arcface - std_arcface, cosine_sim_arcface + std_arcface, alpha=0.4, label="std", color="C1")
+        axs[i].fill_between(x, cosine_sim_arcface - std_arcface, cosine_sim_arcface + std_arcface, alpha=0.4, label="std", facecolor="C1")
         # axs[i].set_ylim(0,1.1)
         axs[i].set_ylabel(r"Average $S_C$")
         if axs[i].get_subplotspec().is_last_row():

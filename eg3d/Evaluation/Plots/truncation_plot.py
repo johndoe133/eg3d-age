@@ -43,7 +43,7 @@ def truncation_plot(network_folder, save_path):
     plt.fill_between(truncation, error - error_std, error + error_std, alpha=0.4, label="std")
     plt.xlabel("Truncation factor")
     plt.ylabel(r"Mean absolute age error")
-    plt.colorbar(label = "MagFace magnitude")
+    plt.colorbar(label = "Mean MagFace score")
     plt.legend()
     fig_name = "truncation"
     plt.savefig(save_path + f"/{fig_name}" + ".png",bbox_inches='tight')
@@ -53,7 +53,7 @@ def truncation_plot(network_folder, save_path):
     plt.figure(dpi=300, figsize=figsize)
     plt.scatter(truncation, mean_mag)
     plt.xlabel("Truncation factor")
-    plt.ylabel(r"MagFace magnitude")
+    plt.ylabel(r"MagFace score")
     fig_name = "magvstrunc"
     plt.savefig(save_path + f"/{fig_name}" + ".png",bbox_inches='tight')
     plt.savefig(save_path + f"/{fig_name}" + ".pgf",bbox_inches='tight')
