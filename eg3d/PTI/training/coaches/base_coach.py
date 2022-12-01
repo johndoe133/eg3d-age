@@ -8,7 +8,7 @@ from criteria.localitly_regulizer import Space_Regulizer
 import torch
 from torchvision import transforms
 from lpips import LPIPS
-from training.projectors import w_projector, z_projector
+from training.projectors import z_projector
 from configs import global_config, paths_config, hyperparameters
 from criteria import l2_loss
 from models.e4e.psp import pSp
@@ -84,14 +84,14 @@ class BaseCoach:
         self.w_pivots[image_name] = w
         return w
 
-    def calc_inversions(self, image, image_name, c):
+    def calc_inversions(self, image, image_name, c, trunc):
 
         if hyperparameters.first_inv_type == 'w+':
             w = self.get_e4e_inversion(image)
 
         else:
             id_image = torch.squeeze((image.to(global_config.device) + 1) / 2) * 255
-            z = z_projector.project(self.G, id_image, c, image_name, device=torch.device(global_config.device), z_avg_samples=600,
+            z = z_projector.project(self.G, id_image, c, image_name, trunc, device=torch.device(global_config.device), z_avg_samples=600,
                                     num_steps=hyperparameters.first_inv_steps, w_name=image_name,
                                     use_wandb=self.use_wandb)
 

@@ -15,9 +15,11 @@ def denormalize(z, rmin = 0, rmax = 75, tmin = -1, tmax = 1):
 
 class SingleIDCoach(BaseCoach):
 
-    def __init__(self, c, image_name, data_loader, use_wandb):
+    def __init__(self, c, image_name, data_loader, use_wandb, evaluation=False, trunc=1.0):
         self.c = c
         self.image_name = image_name
+        self.evaluation = evaluation
+        self.trunc = trunc
         super().__init__(data_loader, use_wandb)
 
     def train(self):
@@ -28,8 +30,8 @@ class SingleIDCoach(BaseCoach):
 
         use_ball_holder = True
 
-        for fname, image in tqdm(self.data_loader):
-            if fname[0] != self.image_name: 
+        for fname, image in (self.data_loader):
+            if (fname[0] != self.image_name): 
                 continue # dont train on the images that is not specified in shell script pti.sh
             image_name = fname[0]
 
@@ -47,7 +49,7 @@ class SingleIDCoach(BaseCoach):
                 w_pivot = self.load_inversions(w_path_dir, image_name)
 
             elif not hyperparameters.use_last_w_pivots or w_pivot is None:
-                z_pivot, age_pivot = self.calc_inversions(image, image_name, self.c)
+                z_pivot, age_pivot = self.calc_inversions(image, image_name, self.c, self.trunc)
                 age_pivot = age_pivot.detach()
                 self.c[:,-1] = age_pivot # update the conditioning parameters so that the found
                 # optmized age is used instead of the previously estimated starting point
@@ -75,7 +77,7 @@ class SingleIDCoach(BaseCoach):
                 if loss_lpips <= hyperparameters.LPIPS_value_threshold:
                     save_img = (generated_images.permute(0, 2, 3, 1)* 127.5 + 128).clamp(0, 255).to(torch.uint8)
                     images.append(save_img)
-                    return age
+                    return age_pivot
                     
 
                 loss.backward()
@@ -93,8 +95,8 @@ class SingleIDCoach(BaseCoach):
             model_path = f'{paths_config.checkpoints_dir}/G'
             os.makedirs(model_path, exist_ok=True)
             model_name = os.path.join(model_path, f'{image_name}.pt')
-            torch.save(self.G,
-                       model_name)
+            torch.save(self.G, model_name)
+            print("Saved G at", model_name)
 
             # save image
             home_dir = os.path.expanduser('~')

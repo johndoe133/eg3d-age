@@ -17,7 +17,7 @@ from tqdm import tqdm
 from configs import global_config, hyperparameters
 from utils import log_utils
 import dnnlib
-from camera_utils import LookAtPoseSampler
+# from camera_utils import LookAtPoseSampler
 from PIL import Image
 import os
 # from camera_utils import LookAtPoseSampler, FOV_to_intrinsics
@@ -28,6 +28,7 @@ def project(
         target: torch.Tensor,  # [C,H,W] and dynamic range [0,255], W & H must match G output resolution
         c,
         image_name,
+        trunc,
         *,
         num_steps=1000,
         z_avg_samples=10000,
@@ -114,7 +115,7 @@ def project(
         zs = (z_opt + z_noise) #.repeat([G.backbone.mapping.num_ws, 1])
         c = torch.cat([P[0], age_opt])[None,:]
         
-        ws = G.mapping(zs, c)
+        ws = G.mapping(zs, c, truncation_psi=trunc)
         synth_images = G.synthesis(ws, c, noise_mode='const', force_fp32=True)['image'] 
 
         # Downsample image to 256x256 if it's larger than that. VGG was built for 224x224 images.

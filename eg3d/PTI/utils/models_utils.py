@@ -19,8 +19,7 @@ def load_tuned_G(run_id, type):
 
 
 def load_old_G():
-    #Hello mate
     with open(paths_config.stylegan2_ada_ffhq, 'rb') as f:
-        old_G = pickle.load(f)['G_ema'].to(global_config.device).eval()
-        old_G = old_G.float()
+        old_G = pickle.load(f)['G_ema'].eval()
+        old_G = old_G.float().to(torch.device('cuda'))
     return old_G

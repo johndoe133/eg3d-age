@@ -1,3 +1,7 @@
-arcface_weights.h5: https://github.com/serengil/deepface_models/releases/download/v1.0/arcface_weights.h5
 ms1mv3_r100.onnx: https://drive.google.com/file/d/1fZOfvfnavFYjzfFoKTh5j1YDcS8KCnio/view?usp=sharing
 det_10g.onnx: https://drive.google.com/file/d/1kUYa0s1XxLW37ZFRGeIfKNr9L_4ScpOg/view?usp=sharing
+yu4u.pth: https://github.com/yu4u/age-estimation-pytorch/releases/download/v1.0/epoch044_0.02343_3.9984.pth
+ffhqrebalanced512-128.pkl: https://api.ngc.nvidia.com/v2/models/nvidia/research/eg3d/versions/1/files/ffhqrebalanced512-128.pkl
+MagFace/iResNet100_MagFace.pth: https://drive.google.com/file/d/1Bd87admxOZvbIOAyTkGEntsEz3fyMt7H/view
+mtcnn: https://github.com/timesler/facenet-pytorch/releases/download/v2.2.9/20180402-114759-vggface2.pt
+
