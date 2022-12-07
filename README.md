@@ -1,4 +1,4 @@
-# eg3d-age
-Conditioning EG3D on age
+# Face Age Progression Based on Generative Adversarial Networks
+##Conditioning [EG3D](https://github.com/NVlabs/eg3d) on age
 
-Refer to https://github.com/NVlabs/eg3d 
+![Image](./eg3d/example.png)
