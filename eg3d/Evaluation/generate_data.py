@@ -1,4 +1,3 @@
-import shutup; shutup.please() 
 from math import trunc
 import click 
 import json
@@ -58,6 +57,9 @@ def generate_data(
     make_id_vs_age: bool,
     make_fancy_age: bool,
     samples_per_age: int,
+    make_angles_data: bool,
+    make_scatter_data: bool,
+    generate_id_data: bool,
     ):
     ## LOADING NETWORK ##
     print(f'Loading networks from "{network_folder}"...')
@@ -74,12 +76,15 @@ def generate_data(
     if generate_average_face:
         print("Making average faces of different ages...")
         average_face(G, save_name, device, truncation_psi, truncation_cutoff, get_camera_parameters, get_conditioning_parameter, image_grid, network_folder)
-    print("Generating age data...")
-    generate_angles_data(G, age_model_name, device, angles_p, angles_y, angles_plot_iterations, save_name, truncation_cutoff, truncation_psi, network_folder)
-    print("Generating id data...")
-    ages_id = generate_id_data(G, device, id_plot_iterations, save_name, truncation_cutoff, truncation_psi, network_folder)
-    print("Generating scatter plot data...")
-    generate_scatter_data(G, device, seed, save_name, network_folder, truncation_cutoff, truncation_psi, age_model_name, scatter_iterations, make_id_vs_age=make_id_vs_age)
+    if make_angles_data:
+        print("Generating age data...")
+        generate_angles_data(G, age_model_name, device, angles_p, angles_y, angles_plot_iterations, save_name, truncation_cutoff, truncation_psi, network_folder)
+    if generate_id_data:
+        print("Generating id data...")
+        ages_id = generate_id_data(G, device, id_plot_iterations, save_name, truncation_cutoff, truncation_psi, network_folder)
+    if make_scatter_data:
+        print("Generating scatter plot data...")
+        generate_scatter_data(G, device, seed, save_name, network_folder, truncation_cutoff, truncation_psi, age_model_name, scatter_iterations, make_id_vs_age=make_id_vs_age)
     if make_truncation_data:
         print("Generating truncation data...")
         generate_truncation_data(G, device, seed, save_name, network_folder)

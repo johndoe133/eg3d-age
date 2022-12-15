@@ -41,7 +41,7 @@ from Evaluation.Plots.truncation_plot import truncation_plot
 @click.option('--angles_y', help='', cls=PythonLiteralOption, required=False, default="[0.4, 0, -0.4]")
 @click.option('--run_generate_data', help='',required=False, default=True)
 @click.option('--scatter_iterations', help='Number of generated random synthetic faces for scatter plot',required=False, default=400)
-@click.option('--numbers', help='Make csv of hard number evaluations like correlation', required=False, is_flag=True, default=True)
+@click.option('--numbers', help='Make csv of hard number evaluations like correlation', required=False, default=True)
 @click.option('--generate_image_folder', help="Make image folder of random images", required=False, default=False)
 @click.option('--generate_average_face', help="", required=False, default=True)
 @click.option('--make_truncation_data', help="", required=False, default=True)
@@ -50,6 +50,12 @@ from Evaluation.Plots.truncation_plot import truncation_plot
 @click.option('--make_angles', help="", required=False, default=True)
 @click.option('--make_fancy_age', help="", required=False, default=True)
 @click.option('--samples_per_age', help="", required=False, default=20)
+@click.option('--plot_truncation_data', help="", required=False, default=True)
+@click.option('--plot_id', help="", required=False, default=True)
+@click.option('--make_angles_data', help="", required=False, default=True)
+@click.option('--make_scatter_data', help="", required=False, default=True)
+@click.option('--compare_baseline', help="Make fancy scatter plot compare with baseline", required=False, default=True)
+@click.option('--generate_id_data', help="Generate id data", required=False, default=True)
 def run_evaluation(
     network_folder: str,
     network: str,
@@ -72,6 +78,12 @@ def run_evaluation(
     make_angles: bool,
     make_fancy_age: bool,
     samples_per_age: int,
+    plot_truncation_data: bool,
+    plot_id: bool,
+    make_angles_data: bool,
+    make_scatter_data: bool,
+    compare_baseline: bool,
+    generate_id_data: bool,
     ):
     np.seterr(all="ignore") # ignore numpy warnings
 
@@ -93,7 +105,7 @@ def run_evaluation(
             angles_plot_iterations, age_model_name, angles_p, angles_y, 
             scatter_iterations, id_plot_iterations, generate_image_folder, 
             generate_average_face, make_truncation_data, make_id_vs_age,
-            make_fancy_age, samples_per_age)
+            make_fancy_age, samples_per_age, make_angles_data, make_scatter_data, generate_id_data)
     
     print("Creating plots...")
     if make_scatter:
@@ -107,14 +119,17 @@ def run_evaluation(
 
     set_age_plot(save_name)
 
-    id_plot(save_name)
+    if plot_id:
+        id_plot(save_name)
 
-    save_correlation(save_name, network_folder=network_folder)
+    if numbers:
+        save_correlation(save_name, network_folder=network_folder)
 
-    truncation_plot(network_folder, save_name)
+    if plot_truncation_data:
+        truncation_plot(network_folder, save_name)
 
     if make_fancy_age:
-        plot_fancy_age(network_folder, save_name)
+        plot_fancy_age(network_folder, save_name, compare_baseline=compare_baseline)
     
     print(f"Evaluation completed.\nSee results in Evaluation/Runs/{save_name}")
     
