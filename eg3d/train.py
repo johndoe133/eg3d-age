@@ -226,9 +226,9 @@ def parse_comma_separated_list(s):
 @click.option('--decoder_lr_mul',    help='decoder learning rate multiplier.', metavar='FLOAT', type=click.FloatRange(min=0), default=1, required=False, show_default=True)
 
 # Age settings
-@click.option('--age_scale',    help='Scales age loss.', metavar='FLOAT', default=1.0, required=False, show_default=True)
-@click.option('--id_scale',    help='Scales id loss.', metavar='FLOAT', default=10.0, required=False, show_default=True)
-@click.option('--age_loss_fn',    help='Type of age loss function', metavar='STR', default="MSE", required=False)
+@click.option('--age_scale', help='Scales age loss.', metavar='FLOAT', default=1.0, required=False, show_default=True)
+@click.option('--id_scale', help='Scales id loss.', metavar='FLOAT', default=10.0, required=False, show_default=True)
+@click.option('--age_loss_fn', help='Type of age loss function', metavar='STR', default="MSE", required=False)
 @click.option('--freeze', help='Freeze parameters of volume synthesis and super resolution modules', metavar='BOOL', default=False, required=False)
 @click.option('--age_version', help='What version of the age estimator to use', type=str, default="v2", required=False)
 @click.option('--age_min', help='Minimum age to generate random ages from', type=int, default=0, required=False)
@@ -238,7 +238,7 @@ def parse_comma_separated_list(s):
 @click.option('--alternate_after', help='After how many images age_loss/id_loss should train before alternating', type=int, required=False, default=100000)
 @click.option('--initial_age_training', help='For how many images we should initally only train using age_loss', type=int, required=False, default=0)
 @click.option('--crop_before_estimate_ages', help="Whether to crop the images before estimating the age", type=bool, required=False, default=False)
-@click.option('--description', help="Decsription of the job - not effect on training", required=False, default="")
+@click.option('--description', help="Decsription of the job (does not always work as intended)", required=False, default="")
 
 def main(**kwargs):
     """Train a GAN using the techniques described in the paper
