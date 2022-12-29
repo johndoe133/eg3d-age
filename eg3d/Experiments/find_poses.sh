@@ -2,7 +2,7 @@
 module load gcc/9.2.0
 module load cuda/11.1
 
-export CUDA_VISIBLE_DEVICES=0,1
+export CUDA_VISIBLE_DEVICES=0
 
 node_ip="$(ifconfig | grep "inet" | awk 'NR==1{print $2}')"
 
