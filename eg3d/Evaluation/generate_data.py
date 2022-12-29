@@ -1,3 +1,6 @@
+
+from math import trunc
+import click 
 import json
 import torch
 import dnnlib
@@ -49,6 +52,9 @@ def generate_data(
     make_id_vs_age: bool,
     make_fancy_age: bool,
     samples_per_age: int,
+    make_angles_data: bool,
+    make_scatter_data: bool,
+    generate_id_data: bool,
     cal,
     ):
     ## LOADING NETWORK ##
@@ -65,12 +71,15 @@ def generate_data(
     if generate_average_face:
         print("Making average faces of different ages...")
         average_face(G, save_name, device, truncation_psi, truncation_cutoff, get_camera_parameters, get_conditioning_parameter, image_grid, network_folder, cal)
-    print("Generating age data...")
-    generate_angles_data(G, age_model_name, device, angles_p, angles_y, angles_plot_iterations, save_name, truncation_cutoff, truncation_psi, network_folder, cal)
-    print("Generating id data...")
-    generate_id_data(G, device, id_plot_iterations, save_name, truncation_cutoff, truncation_psi, network_folder, cal)
-    print("Generating scatter plot data...")
-    generate_scatter_data(G, device, seed, save_name, network_folder, truncation_cutoff, truncation_psi, age_model_name, scatter_iterations, cal, 
+    if make_angles_data:
+        print("Generating age data...")
+        generate_angles_data(G, age_model_name, device, angles_p, angles_y, angles_plot_iterations, save_name, truncation_cutoff, truncation_psi, network_folder, cal)
+    if generate_id_data:
+        print("Generating id data...")
+        generate_id_data(G, device, id_plot_iterations, save_name, truncation_cutoff, truncation_psi, network_folder, cal)
+    if make_scatter_data:
+        print("Generating scatter plot data...")
+        generate_scatter_data(G, device, seed, save_name, network_folder, truncation_cutoff, truncation_psi, age_model_name, scatter_iterations, cal, 
                             get_camera_parameters, get_conditioning_parameter, generate_image_folder, make_id_vs_age=make_id_vs_age)
     if make_truncation_data:
         print("Generating truncation data...")
