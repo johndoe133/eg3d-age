@@ -1,23 +1,9 @@
 import click 
-import torch
-import dnnlib
-import legacy
-from camera_utils import LookAtPoseSampler, FOV_to_intrinsics
 import numpy as np
-import pandas as pd
 import os
-import matplotlib.pyplot as plt
-from sklearn.neighbors import KernelDensity
-from training.estimate_age import AgeEstimator, AgeEstimatorNew
-from training.training_loop import normalize, denormalize
-from tqdm import tqdm
-from training.face_id import FaceIDLoss
-from scipy.stats import gaussian_kde
-from training.coral import Coral
-from plot_training_results import plot_setup, compute_figsize
 from train import PythonLiteralOption
 
-from Evaluation.generate_data import generate_data, save_image_folder
+from Evaluation.generate_data import generate_data
 from Evaluation.Plots.plot_fancy_age import plot_fancy_age
 from Evaluation.Plots.angles_plot import angles_plot
 from Evaluation.Plots.set_age_plot import set_age_plot
@@ -35,7 +21,7 @@ from Evaluation.Plots.truncation_plot import truncation_plot
 @click.option('--trunc', 'truncation_psi', type=float, help='Truncation psi', default=1, show_default=True)
 @click.option('--trunc-cutoff', 'truncation_cutoff', type=int, help='Truncation cutoff', default=14, show_default=True)
 @click.option('--angles_plot_iterations', help='Number of random seeds to generate synthetic images from when making the angles plot', default=200, type=int)
-@click.option('--id_plot_iterations', help='Number of random seeds to generate synthetic images from when making the id plot', default=10, type=int)
+@click.option('--id_plot_iterations', help='Number of random seeds to generate synthetic images from when making the id plot', default=20, type=int)
 @click.option('--age_model_name', help='Age model used', default="DEX", type=str)
 @click.option('--angles_p', help='', cls=PythonLiteralOption, required=False, default="[0.4, 0, -0.4]")
 @click.option('--angles_y', help='', cls=PythonLiteralOption, required=False, default="[0.4, 0, -0.4]")
@@ -50,6 +36,7 @@ from Evaluation.Plots.truncation_plot import truncation_plot
 @click.option('--make_angles', help="", required=False, default=True)
 @click.option('--make_fancy_age', help="", required=False, default=True)
 @click.option('--samples_per_age', help="", required=False, default=20)
+@click.option('--calibrated', help="", required=False, default=False)
 def run_evaluation(
     network_folder: str,
     network: str,
@@ -72,9 +59,9 @@ def run_evaluation(
     make_angles: bool,
     make_fancy_age: bool,
     samples_per_age: int,
+    calibrated: bool,
     ):
     np.seterr(all="ignore") # ignore numpy warnings
-
     if network is not None: # choose specific network
         network_pkl = network
     else: # choose the network trained the longest
@@ -83,7 +70,18 @@ def run_evaluation(
         network_pkl = pkls[-1]
     network_pkl_path = os.path.join(network_folder, network_pkl)
     save_name = f"{network_pkl_path.split('/')[2]}-{network_pkl.split('.')[0][8:]}-trunc-{truncation_psi}"
-
+    
+    cal = lambda age: age
+    
+    if calibrated:
+        calibration_path = os.path.join(network_folder, f"calibrate-{truncation_psi}.npy")
+        if os.path.isfile(calibration_path):
+            save_name += "-c"
+            a , b = np.load(calibration_path)
+            cal = lambda age: (age-b)/a
+        else:
+            print("Cannot run calibrated evaluation since calibration parameters are missing.")
+            print("Will run normal evaluation instead.")
 
     if run_generate_data:
         print("Generating data...")
@@ -93,7 +91,7 @@ def run_evaluation(
             angles_plot_iterations, age_model_name, angles_p, angles_y, 
             scatter_iterations, id_plot_iterations, generate_image_folder, 
             generate_average_face, make_truncation_data, make_id_vs_age,
-            make_fancy_age, samples_per_age)
+            make_fancy_age, samples_per_age, cal)
     
     print("Creating plots...")
     if make_scatter:
