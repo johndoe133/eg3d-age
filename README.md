@@ -11,6 +11,24 @@ INSERT ABSTRACT
 
 
 ## Installation
+In order to replicated age-EG3D, first clone the repository and change the directory
+
+```
+git clone https://github.com/johndoe133/eg3d-age/
+cd eg3d-age/eg3d
+```
+
+Then, use conda to create the environment and activate it
+
+```
+conda env create -f ./environments/eg3d.yml
+conda activate eg3d
+```
+
+
+
+
+
 
 ## Training
 
