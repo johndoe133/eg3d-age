@@ -78,14 +78,14 @@ def generate_images(
             loss_id.append(0)
             loss_id_std.append(0)
         hours.append(data['Timing/total_hours']['mean'])
-    
+
     fid = []
     fid_filename = 'metric-fid50k_full.jsonl'
     path_fid = os.path.join(root, training_run, fid_filename)
     fid_df = pd.read_json(path_fid, lines=True)
     for row in fid_df.iterrows():
         fid.append(row[1]["results"]["fid50k_full"])
-    
+
     sub_runs  = [ f.path for f in os.scandir(os.path.join(root, training_run)) if f.is_dir() ]
     first_train_run = sub_runs[0]
     training_option_path = os.path.join(first_train_run, "training_options.json")
@@ -106,9 +106,9 @@ def generate_images(
     img_pr_tick = 4000
     x = range(len(hours))
     x = np.array(x) * img_pr_tick
-    
-    #GD_ylim = max(list(loss_G + loss_G_std) + list(loss_D + loss_D_std)) * 1.10
-    ## AGE LOSS ##
+
+    GD_ylim = max(list(loss_G + loss_G_std) + list(loss_D + loss_D_std)) * 1.10
+    # AGE LOSS ##
     axs1.plot(x, loss_age, label="Loss")
     age_loss_ylim = max(loss_age + loss_age_std)
     axs1.set_ylabel("$\mathcal{L}_{Age}$")
@@ -120,29 +120,37 @@ def generate_images(
     axs1.grid(visible=True, axis="y", zorder=0)
 
     ## ID LOSS ##
-    axs2.plot(x, loss_id, label="Loss")
+    mask=np.where((loss_id!=0) & (x <= 1440000))[0]
+    x =  x[mask]
+    loss_id = loss_id[mask]
+    loss_id_std = loss_id_std[mask]
+    axs2.plot(x, loss_id, label="Avg. loss over 4k images")
+    # snapshot is made at 1400k images and the further training progress is unsaved and therefore not plotted
     if id:
         id_loss_ylim = max(loss_id + loss_id_std)
     else:
         id_loss_ylim = 1
     axs2.set_ylabel("$\mathcal{L}_{ID}$")
     axs2.set_ylim(0, id_loss_ylim*1.05)
+    _,xmax = axs2.get_xlim()
+    axs2.set_xlim(0, xmax)
     axs2.xaxis.set_major_formatter(ticker.FuncFormatter(lambda x, pos: '{:,.0f}'.format(x/1000) + 'k'))
     axs2.fill_between(x, loss_id - loss_id_std, loss_id + loss_id_std, alpha=0.4, label="std")
     axs2.set_title(r"With $\alpha_{ID}$ = " + str(id_scale))
-    axs2.legend(loc='upper right')
+    axs2.legend(loc='upper left')
+    axs2.set_xlabel("Real images trained on")
     axs2.grid(visible=True, axis="y", zorder=0)
 
-    ## GENERATOR LOSS ##
+    # GENERATOR LOSS ##
     axs3.set_ylabel("$\mathcal{L}_{G}$")
     axs3.xaxis.set_major_formatter(ticker.FuncFormatter(lambda x, pos: '{:,.0f}'.format(x/1000) + 'k'))
     axs3.fill_between(x, loss_G - loss_G_std, loss_G + loss_G_std, alpha=0.4, label="std")
     axs3.set_ylim(0,max(loss_G + loss_G_std)*1.10)
-    axs3.plot(x, loss_G, label="Loss")
+    axs3.plot(x, loss_G, label="Avg. loss over 4k images")
     axs3.legend(loc='upper right')  
     axs3.grid(visible=True, axis="y", zorder=0)  
 
-    ## DISCRIMINATOR LOSS ##
+    # DISCRIMINATOR LOSS ##
     axs4.plot(x, loss_D, label="Loss")
     axs4.xaxis.set_major_formatter(ticker.FuncFormatter(lambda x, pos: '{:,.0f}'.format(x/1000) + 'k'))
     axs4.set_ylabel("$\mathcal{L}_{D}$")
@@ -160,19 +168,17 @@ def generate_images(
     fig.tight_layout()
     fig.savefig(plot_path)
     plt.savefig(plot_path_pgf)
-    
+
     print(f'Saved figures to {os.path.join(root, outdir)}')
-    
-    
-    
+
     ## FID score
     print("Making FID plot...")
-    plt.figure(figsize=(2.5,3), dpi=dpi)
+    plt.figure(figsize=(3, 2.5), dpi=dpi)
     plt.ylabel("FID Score")
     x_fid = np.array(range(len(fid)))
     plt.bar(x_fid, fid, zorder=20)
-    plt.xlabel("Images trained on")
-    plt.xticks(x_fid, [str(int(x)) + 'k' for x in x_fid*img_pr_tick*snap/1000])
+    plt.xlabel("Real images trained on")
+    plt.xticks(x_fid, [str(int(x)) + 'k' for x in x_fid*img_pr_tick*snap/1000], rotation=90)
     plt.grid(axis='y')
     plt.tight_layout()
     plt.savefig(os.path.join(root, outdir, "fid_score.png"))
