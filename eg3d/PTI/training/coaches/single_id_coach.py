@@ -63,8 +63,8 @@ class SingleIDCoach(BaseCoach):
             real_images_batch = image.to(global_config.device)
             images = []
             for i in tqdm(range(hyperparameters.max_pti_steps)):
-
-                generated_images = self.forward(z_pivot)
+                
+                generated_images = self.forward(z_pivot, self.trunc)
                 loss, l2_loss_val, loss_lpips = self.calc_loss(generated_images, real_images_batch, image_name,
                                                                self.G, use_ball_holder, z_pivot)
                 # save progress
