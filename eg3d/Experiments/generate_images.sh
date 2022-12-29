@@ -10,4 +10,4 @@ python -m debugpy \
     --listen $node_ip:1500 plot_progressive.py \
     --seed=42 \
     --network_folder=./training-runs/00187/00000-ffhq-FFHQ-gpus2-batch8-gamma5 \
-    --trunc=0.75 --calibrated True
+    --trunc=0.75 \
