@@ -77,25 +77,27 @@ def id_plot(save_path):
     df['cosine_sim_arcface_transformed'] = cosine_sim_arcface_transformed.reshape(-1)
 
     training_id_model = df.id_train.iloc[0]
-
+    figsize = compute_figsize(340, 550)
     fig, axs = plt.subplots(len(ages), 1, sharey=False, sharex=True, figsize = figsize, dpi=300)
     df_grouped = df.groupby(["age1","age2"]).mean().reset_index()
     df_grouped_std = df.groupby(["age1","age2"]).std().reset_index()
     for i, age1 in enumerate(ages):
-        cosine_sim = df_grouped[df_grouped.age1 == age1].cosine_sim_transformed.to_list()
-        std = df_grouped_std[df_grouped_std.age1 == age1].cosine_sim_transformed.to_list()
+        cosine_sim = df_grouped[df_grouped.age1 == age1].cosine_sim.to_list()
+        std = df_grouped_std[df_grouped_std.age1 == age1].cosine_sim.to_list()
         x = df_grouped[df_grouped.age1 == age1].age2.to_list()
 
         # x.insert(i, age1)
-        cosine_sim_arcface = df_grouped[df_grouped.age1 == age1].cosine_sim_arcface_transformed.to_list()
-        std_arcface = df_grouped_std[df_grouped_std.age1 == age1].cosine_sim_arcface_transformed.to_list()
+        cosine_sim_arcface = df_grouped[df_grouped.age1 == age1].cosine_sim_arcface.to_list()
+        std_arcface = df_grouped_std[df_grouped_std.age1 == age1].cosine_sim_arcface.to_list()
         
         # cosine_sim.insert(i,1)
         # std.insert(i,0)
-        # std[i] = 0
+        cosine_sim[i]=1
+        std[i] = 0
         # cosine_sim_arcface.insert(i,1)
         # std_arcface.insert(i,0)
-        # std_arcface[i]=0
+        cosine_sim_arcface[i]=1
+        std_arcface[i]=0
 
         x, cosine_sim, std, cosine_sim_arcface, std_arcface = np.array(x), np.array(cosine_sim), np.array(std), np.array(cosine_sim_arcface), np.array(std_arcface)
 
@@ -110,11 +112,20 @@ def id_plot(save_path):
         axs[i].set_ylabel(r"Average $S_C$")
         if axs[i].get_subplotspec().is_last_row():
             axs[i].set_xlabel("Age")
-        legend = axs[i].legend(bbox_to_anchor=(1, 1), loc='upper left', edgecolor='0')
         axs[i].set_xticks(ages) 
         axs[i].set_xticklabels(ages)
         axs[i].set_title(f"Considered age: {ages[i]}")
-    fig.tight_layout()
+
+        xlim = axs[i].get_xlim()
+
+        axs[i].hlines(0.8729, -10, 120, colors='C0', linestyles = 'dashed', label="MagFace\nNon-mated\naverage $S_C$")
+        axs[i].hlines(0.0107, -10, 120, colors='C1', linestyles = 'dashed', label="ArcFace\nNon-mated\naverage $S_C$")
+        axs[i].set_xlim(xlim)
+        if i==2:
+            legend = axs[i].legend(bbox_to_anchor=(1.36, 0.5), loc='center right', edgecolor='0')
+
+    # fig.tight_layout()
+    plt.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=None, hspace=0.4)
     fig_name = "id2.png"
-    plt.savefig(save_path + f"/{fig_name}")
+    plt.savefig(save_path + f"/{fig_name}", bbox_inches="tight")
     print(f"Figure {fig_name} save at {save_path}")  

@@ -4,8 +4,7 @@ import pandas as pd
 import os 
 import json
 import numpy as np
-from training.training_loop import normalize, denormalize, get_age_category
-import re 
+from training.training_loop import normalize, denormalize
 from matplotlib import cm
 import seaborn as sn
 
@@ -71,6 +70,7 @@ def scatter_plot(network_folder, path):
     fig, axs = plt.subplots(1, 2, sharey=True, sharex=False, figsize = figsize, dpi=300, gridspec_kw={'width_ratios': [1, 1.15]})
     # plt.xticks(np.linspace(0, (age_max//10)*10, (age_max//10)+1))
     # plt.yticks(np.linspace(0, (age_max//10)*10, (age_max//10)+1))
+    a, b = np.polyfit(age_true, age_hat, 1)
     axs[0].scatter(age_true, age_hat, s=5, c=mag, cmap="winter")
     axs[0].set_xlabel("Target age")
     axs[0].set_ylabel("Predicted age")
@@ -78,6 +78,7 @@ def scatter_plot(network_folder, path):
     axs[0].set_yticks(np.linspace(0, (age_max//10+1)*10, (age_max//10)+2))
     axs[0].set_title("yu4u model")
     xlim, ylim = axs[0].get_xlim(), axs[0].get_ylim()
+    axs[0].plot(np.linspace(-10,110,10), a*np.linspace(-10,110,10) + b, color='r', label="Best fit", zorder=20)
     axs[0].plot([-20, 150], [-20, 150], '--', label="Perfect\nprediction", color='black')
     axs[0].set_xlim(xlim); axs[0].set_ylim(ylim)
     axs[0].legend(loc='upper left')

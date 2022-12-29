@@ -15,7 +15,7 @@ def save_correlation(scatter_data, file_name='numbers.csv', network_folder=None)
     mag = np.array(ages_df['mag'])
     columns = ['yu4u', 'FPAge']
 
-    rows = ['correlation', 'corr_p_val', 'mae', 'num_samples', 'std', 'cs5', 'cs10', 'cs15', 'mag_corr', 'mag_p_val']
+    rows = ['correlation', 'num_samples', 'MAE', 'std', 'CS_5', 'CS_10', 'CS_15']
 
     corr_yu4u = pearsonr(age_true, age_hat)
     corr_fpage = pearsonr(age_true, age_hat_fpage)
@@ -39,24 +39,25 @@ def save_correlation(scatter_data, file_name='numbers.csv', network_folder=None)
     std_fpage = np.std(error_fpage)
     n_samples = len(age_true)
 
-    cs5_yu4u = np.sum(error_yu4u > 5) / n_samples
-    cs10_yu4u = np.sum(error_yu4u > 10) / n_samples
-    cs15_yu4u = np.sum(error_yu4u > 15) / n_samples
-    cs5_fpage = np.sum(error_fpage > 5) / n_samples
-    cs10_fpage = np.sum(error_fpage > 10) / n_samples
-    cs15_fpage = np.sum(error_fpage > 15) / n_samples
+    cs5_yu4u = int(round((np.sum(error_yu4u > 5) / n_samples) * 100,0))
+    cs10_yu4u = int(round((np.sum(error_yu4u > 10) / n_samples) * 100,0))
+    cs15_yu4u = int(round((np.sum(error_yu4u > 15) / n_samples) * 100,0))
+    cs5_fpage = int(round((np.sum(error_fpage > 5) / n_samples) * 100,0))
+    cs10_fpage = int(round((np.sum(error_fpage > 10) / n_samples) * 100,0))
+    cs15_fpage = int(round((np.sum(error_fpage > 15) / n_samples) * 100,0))
 
     error_mag_corr_yu4u = pearsonr(error_yu4u, mag)
     error_mag_corr_fpage = pearsonr(error_fpage, mag)
 
     data = [
-            [corr_yu4u[0],corr_fpage[0]], [corr_yu4u[1],corr_fpage[1]], [mae_yu4u,mae_fpage],
-            [n_samples, n_samples],  [std_yu4u,std_fpage],  [cs5_yu4u,cs5_fpage], [cs10_yu4u,cs10_fpage], 
-            [cs15_yu4u, cs15_fpage], [error_mag_corr_yu4u[0], error_mag_corr_yu4u[0]], 
-            [error_mag_corr_yu4u[1],error_mag_corr_fpage[1]]
+            [corr_yu4u[0],corr_fpage[0]],[n_samples, n_samples], [mae_yu4u,mae_fpage],
+            [std_yu4u,std_fpage],  [cs5_yu4u,cs5_fpage], [cs10_yu4u,cs10_fpage], 
+            [cs15_yu4u, cs15_fpage]
             ]
 
 
     df = pd.DataFrame(data, columns=columns)
     df.index=rows
+    df = df.round(3)
     df.to_csv(os.path.join(root, 'numbers_eval.csv'))
+    print(df.to_latex())

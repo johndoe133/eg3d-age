@@ -25,7 +25,7 @@ def truncation_plot(network_folder, save_path):
     df = pd.read_csv(os.path.join(save_path, "truncation_data.csv"))
 
     df.age_hat = df.age_hat.apply(lambda x: denormalize(x, rmin=age_min, rmax=age_max))
-    df['error'] = np.abs(df.age - df.age_hat)
+    df['error'] = np.abs(df.age - df.fpage_hat)
     colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
 
     grouped_data = df.groupby('truncation_psi')
@@ -41,8 +41,8 @@ def truncation_plot(network_folder, save_path):
     plt.scatter(truncation, error, s=10, c=mean_mag, cmap="winter", zorder=20)
     plt.plot(truncation, error, color="black", alpha=0.6, zorder=1)
     plt.fill_between(truncation, error - error_std, error + error_std, alpha=0.4, label="std")
-    plt.xlabel("Truncation factor")
-    plt.ylabel(r"Mean absolute age error")
+    plt.xlabel(r"$\psi$")
+    plt.ylabel(r'$\textrm{MAE}_{\texttt{FPAge}}$')
     plt.colorbar(label = "Mean MagFace score")
     plt.legend()
     fig_name = "truncation"
