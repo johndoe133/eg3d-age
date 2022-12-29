@@ -100,6 +100,18 @@ class AgeEstimatorNew():
         logits_categorized = zeros.index_add_(1, buckets - 1, logits)
         return logits_categorized
 
+    def estimate_age_evaluate(self, images):
+        """Used for evaluating where the training data has already been resized and aligned.
+
+        Args:
+            images (tensor): batch, C, 224, 224
+
+        Returns:
+            tensor: predictions, size [batch, 1]
+        """
+        outputs = F.softmax(self.age_model(images), dim=-1)
+        predicted_ages = (outputs * self.ages).sum(axis=-1)
+        return predicted_ages 
     def estimate_age_rgb(self, image, normalize = True):
         image = image.type('torch.FloatTensor')
         if self.crop:

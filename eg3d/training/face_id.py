@@ -132,7 +132,7 @@ class FaceIDLoss:
         bboxes, probs, landmarks = self.mtcnn.detect(imgs_rgb, landmarks=True) 
         
         for i, (bbox, prob, landmark) in enumerate(zip(bboxes, probs, landmarks)):
-            if None in prob: # no face detected
+            if prob is None: # no face detected
                 aligned_imgs.append(None) # handled in get_feature_vector
             else: # face detected
                 source = np.array([
@@ -165,11 +165,11 @@ class FaceIDLoss:
         loaded using cv2:
 
         ```
-        image1 = cv2.imread(PATH TO IMAGE)
+        image1 = cv2.imread(p1)
         image1 = cv2.cvtColor(image1, cv2.COLOR_BGR2RGB)
         img_tensor = torch.from_numpy(image1)
         img_tensor = img_tensor.to(device)
-        v = model.get_feature_vector_test(img_tensor.float())
+        v = model.get_feature_vector_test(img_tensor[None,:,:,:].float())
         ```
 
         Args:
@@ -179,12 +179,16 @@ class FaceIDLoss:
             tensor: feature vector
         """
         aligned = self.align(img)
-        if aligned is None:
-            only_resized = self.resize(img.permute(2,0,1)[None,:,:,:])
-            feature_vector = self.id_model(only_resized)
-        else:
-            feature_vector = self.id_model(aligned.permute(2,0,1)[None,:,:,:])
+        aligned = torch.stack(aligned)
+
+        feature_vector = self.id_model(aligned.permute(0,3,1,2)) # id_model takes shape [batch, channels, w, h]
         return feature_vector
+        # if aligned is None:
+        #     only_resized = self.resize(img.permute(2,0,1)[None,:,:,:])
+        #     feature_vector = self.id_model(only_resized)
+        # else:
+        #     feature_vector = self.id_model(aligned.permute(2,0,1)[None,:,:,:])
+        # return feature_vector
 
     def transform_to_RGB(self, img):
         img255 = (img * 127.5 + 128).clamp(0, 255)
@@ -549,27 +553,76 @@ def get_torch_home():
 
 if __name__=="__main__":
     device = torch.device("cuda")
-    model = FaceIDLoss(device, model="ArcFace")
-    p = '/zhome/d7/6/127158/Documents/eg3d-age/age-estimation-pytorch/in/img00000022.png'
-    p2 = '/zhome/d7/6/127158/Documents/eg3d-age/age-estimation-pytorch/in/img00000024.png'
-    image1 = cv2.imread(p)
-    # image1 = cv2.cvtColor(image1, cv2.COLOR_BGR2RGB)
-    img_tensor = torch.from_numpy(image1).float()
-    img_tensor = img_tensor.to(device).requires_grad_(True)
+    arcface = FaceIDLoss(device, model="ArcFace")
+    magface = FaceIDLoss(device, model="MagFace")
+    # p = '/zhome/d7/6/127158/Documents/eg3d-age/age-estimation-pytorch/in/img00000022.png'
+    # p2 = '/zhome/d7/6/127158/Documents/eg3d-age/age-estimation-pytorch/in/img00000024.png'
+    # image1 = cv2.imread(p)
+    # # image1 = cv2.cvtColor(image1, cv2.COLOR_BGR2RGB)
+    # img_tensor = torch.from_numpy(image1).float()
+    # img_tensor = img_tensor.to(device).requires_grad_(True)
     
-    f1 = model.get_feature_vector_arcface(img_tensor[None,:,:,:].permute(0,3,1,2))
-    print(f1)
-    image2 = cv2.imread(p2)
-    # image2 = cv2.cvtColor(image2, cv2.COLOR_BGR2RGB)
-    img_tensor2 = torch.from_numpy(image2)
-    img_tensor2 = img_tensor2.to(device)
-    img_3 = torch.ones((3,512,512)).to(device)
-    img = torch.stack([img_3, img_tensor.permute(2,0,1), img_tensor2.permute(2,0,1)])
+    # f1 = model.get_feature_vector_arcface(img_tensor[None,:,:,:].permute(0,3,1,2))
+    # print(f1)
+    # image2 = cv2.imread(p2)
+    # # image2 = cv2.cvtColor(image2, cv2.COLOR_BGR2RGB)
+    # img_tensor2 = torch.from_numpy(image2)
+    # img_tensor2 = img_tensor2.to(device)
+    # img_3 = torch.ones((3,512,512)).to(device)
+    # img = torch.stack([img_3, img_tensor.permute(2,0,1), img_tensor2.permute(2,0,1)])
 
-    f2 = model.get_feature_vector_arcface(image2)
+    # f2 = model.get_feature_vector_arcface(image2)
 
-    # stack image1 og 2 og se om det virker med alignment
+    # # stack image1 og 2 og se om det virker med alignment
+    # cosine_sim_f = torch.nn.CosineSimilarity()
+    # print("SIM:", cosine_sim_f(torch.tensor([f1]), torch.tensor([f2])))
+    # # print("Norm", np.linalg.norm(v2.detach().cpu().numpy()))
+    from itertools import tee
+    def pairwise(iterable):
+        "s -> (s0,s1), (s1,s2), (s2, s3), ..."
+        a, b = tee(iterable)
+        next(b, None)
+        return zip(a, b)
+    appa = r"/work3/morbj/APPA/appa-real-release/valid"
     cosine_sim_f = torch.nn.CosineSimilarity()
-    print("SIM:", cosine_sim_f(torch.tensor([f1]), torch.tensor([f2])))
-    # print("Norm", np.linalg.norm(v2.detach().cpu().numpy()))
+    ffhq="/work3/morbj/FFHQ/00000"
+    image_names = list(filter(lambda x: False if ('.mat' in x or '_face' in x) else True, os.listdir(ffhq)))
+    i=0
+    sims=[]
+    sims_mag = []
+    for img1, img2 in pairwise(image_names):
+        if i > 100:
+            break
+
+        p1 = os.path.join(ffhq, img1)
+        p2 = os.path.join(ffhq, img2)
+
+        image1 = cv2.imread(p1)
+        image1 = cv2.cvtColor(image1, cv2.COLOR_BGR2RGB)
+        img_tensor = torch.from_numpy(image1)
+        img_tensor = img_tensor.to(device)
+
+        image1 = cv2.imread(p1)
+        image2 = cv2.imread(p2)
+
+        f1 = arcface.get_feature_vector_arcface(image1)
+        f2 = arcface.get_feature_vector_arcface(image2)
+
+        image_tensor1 = torch.from_numpy(image1).to(device)
+        image_tensor2 = torch.from_numpy(image2).to(device)
+        f1_mag = magface.get_feature_vector_test(image_tensor1[None,:,:,:].float())
+        f2_mag = magface.get_feature_vector_test(image_tensor2[None,:,:,:].float())
+    
+        sim = cosine_sim_f(torch.tensor(f1), torch.tensor(f2)).item()
+        sims.append(sim)
+
+        sim_mag = cosine_sim_f(torch.tensor(f1_mag), torch.tensor(f2_mag)).item()
+        sims_mag.append(sim_mag)
+        print(f"{p1}, {p2} SIM:", sim)
+        i+= 1
+        
+    sims=np.array(sims)
+    sims_mag=np.array(sims_mag)
+    print("ArcFace Average non-mated similarity score", sims.mean())
+    print("MagFace Average non-mated similarity score", sims_mag.mean())
 
