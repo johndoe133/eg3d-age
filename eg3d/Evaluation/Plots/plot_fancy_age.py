@@ -42,7 +42,8 @@ def plot_fancy_age(network_folder, save_name):
     plt.figure(figsize=figsize, dpi=300)
     plt.xticks(list(range(age_min, age_max + 5, 5)))
 
-    df2 = pd.read_csv(os.path.join(r"/zhome/d7/6/127158/Documents/eg3d-age/eg3d/Evaluation/cognitec/cognitec_estimated_ages_scatter_data.txt"))
+    #cognitech
+    df2 = pd.read_csv(os.path.join(r"/zhome/d7/6/127158/Documents/eg3d-age/eg3d/Evaluation/cognitec/cognitec_estimated_ages_scatter_data.txt")) #cognitec evaluations
     df2.columns=["name", "estimate"]
     df2['psi'] = df2.name.apply(lambda x: float(x.split("-")[2].split("_")[0]))
     df2['calibrated'] = df2.name.apply(lambda x: True if "-c" in x else False)
@@ -50,7 +51,7 @@ def plot_fancy_age(network_folder, save_name):
     df2['fancy'] = df2.name.apply(lambda x: True if "fancy" in x else False)
     df2['error'] = np.abs(df2.target - df2.estimate)
     # df['yu4u'] = df.name.apply(lambda x: float(x.split("_")[-1].split("-")[1].replace(",",".")))
-    df_fancy = df2[df2.fancy == True]
+    df_fancy = df2[(df2.fancy == True) & (df2.calibrated == True)]
     df_fancy_group = df_fancy.groupby('target').mean().reset_index()
     df_fancy_std = df_fancy.groupby('target').std().reset_index()
     # cognitec ONLY FOR O.75-C 
