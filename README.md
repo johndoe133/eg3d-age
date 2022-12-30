@@ -5,15 +5,15 @@
 ## Conditioning [EG3D](https://github.com/NVlabs/eg3d) on age
 
 <p align="center">
-      <img src="./eg3d/42_l.gif" align="left" width="33%">
-      <img src="./eg3d/42_m.gif" align="middle" width="33%">
-      <img src="./eg3d/42_r.gif" align="right" width="33%">
+      <img src="./readme_files/42_l.gif" align="left" width="33%">
+      <img src="./readme_files/42_m.gif" align="middle" width="33%">
+      <img src="./readme_files/42_r.gif" align="right" width="33%">
 </p>
 
 <p align="center">
-      <img src="./eg3d/300_l.gif" align="left" width="33%">
-      <img src="./eg3d/300_m.gif" align="middle" width="33%">
-      <img src="./eg3d/300_r.gif" align="right" width="33%">
+      <img src="./readme_files/7652_l.gif" align="left" width="33%">
+      <img src="./readme_files/7652_m.gif" align="middle" width="33%">
+      <img src="./readme_files/7652_r.gif" align="right" width="33%">
 </p>
 
 
@@ -110,3 +110,24 @@ img = G.synthesis(ws, c_params.float())['image']
 img.permute(0, 2, 3, 1) * 127.5 + 128).clamp(0, 255).to(torch.uint8)
 pil_img = Image.fromarray(img[0].cpu().numpy(), 'RGB')
 ```
+
+
+## Inversions
+
+[PTI](https://github.com/danielroich/PTI) is used for inversions but in a slightly modified way. The code is found in ``./eg3d/PTI``.
+
+Preparing the datasets should mean that the following folder exist `dataset_preprocessing/ffhq/Deep3DFaceRecon_pytorch`. Use conda to install the `deep3d` environment in the `environments` folder. Place the images you want to crop in `dataset_preprocessing/ffhq/Deep3DFaceRecon_pytorch/test` and run [find_poses.sh](./eg3d/Experiments/find_poses.sh)
+```
+conda activate deep3d
+sh Experiments/find_poses.sh
+```
+This should create the folder `dataset_preprocessing/ffhq/Deep3DFaceRecon_pytorch/test/crop` with the cropped images. 
+
+Use conda to install the `pti` enviroment from the `environments` folder. In [pti.sh](./eg3d/Experiments/pti.sh) specify the name of one of the cropped images as `--image_name`. Run the inversion with
+```
+conda activate pti
+sh Experiments/pti.sh
+```
+The output is found in `eg3d/PTI/output`. 
+
+Note that paths and such might need to be updated in order to run the above inversion scripts. 

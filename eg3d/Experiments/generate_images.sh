@@ -8,6 +8,6 @@ export CUDA_VISIBLE_DEVICES=0,1
 
 python -m debugpy \
     --listen $node_ip:1500 plot_progressive.py \
-    --seed=42 \
+    --seed=7652 \
     --network_folder=./training-runs/00187/00000-ffhq-FFHQ-gpus2-batch8-gamma5 \
-    --trunc=0.75 \
+    --trunc=0.75 --calibrated=True\

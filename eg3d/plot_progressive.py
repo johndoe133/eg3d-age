@@ -129,14 +129,18 @@ def generate_images(
     for i, age in enumerate(ages):
         draw.text(((i*512)+230,0), f"Age: {int(age)}", (0,0,0), font=font)
 
-    pil_img.save(f'{network_folder}/network{pkl_name}_seed{seed:04d}.png')
-    print(f'Saved at {outdir}/network{pkl_name}_seed{seed:04d}.png')
+    if calibrated:
+        pil_img.save(f'{network_folder}/network{pkl_name}_seed{seed:04d}-t-{truncation_psi}-cal.png')
+        print(f'Saved at {network_folder}/network{pkl_name}_seed{seed:04d}-t-{truncation_psi}-cal.png')
+    else:
+        pil_img.save(f'{network_folder}/network{pkl_name}_seed{seed:04d}-t-{truncation_psi}.png')
+        print(f'Saved at {network_folder}/network{pkl_name}_seed{seed:04d}-t-{truncation_psi}.png')
 
     ######## GIF #########
     font = ImageFont.truetype("FreeSerif.ttf", 40)
 
     print("Creating .gif file...")
-    ages = np.linspace(-1,1,age_max - age_min) #one for each age
+    ages = np.linspace(0,75, 76) #one for each age
     imgs_gif = []
     
     angle_y, angle_p = (0, 0)
@@ -149,7 +153,7 @@ def generate_images(
 
     for age in ages:
         if age_loss_fn == "MSE":
-            age_list = [cal(age)]
+            age_list = [normalize(cal(age), rmin=age_min, rmax=age_max)]
         elif age_loss_fn == "CAT":
             age_list = [0] * 101
             age_list[int(age)] = 1
@@ -163,14 +167,14 @@ def generate_images(
         img = (img.permute(0, 2, 3, 1) * 127.5 + 128).clamp(0, 255).to(torch.uint8)
         pil_img = Image.fromarray(img[0,:,:,:].cpu().numpy().astype('uint8')) # to draw on
         text_added = ImageDraw.Draw(pil_img)
-        text_color="#A0240A"
-        text_added.text((0,450), f"Age: {int(denormalize(age, rmin=age_min, rmax=age_max))}", font=font, fill=text_color) #SKAL BRUGE AGE_MIN AGE_MAX
+        text_color="#FFFFFF"
+        text_added.text((0,450), f"Age: {int(age)}", font=font, fill=text_color) #SKAL BRUGE AGE_MIN AGE_MAX
         imgs_gif.append(np.array(pil_img))
 
     # imgs_gif = [tensor.cpu().numpy()[0,:,:,:] for tensor in imgs_gif]
     print("Saving gif..")
-    imageio.mimsave(f'{network_folder}/network{pkl_name}_seed{seed:04d}.gif', imgs_gif)
-    print(f'Saved at {network_folder} as network{pkl_name}_seed{seed:04d}.gif')
+    imageio.mimsave(f'{network_folder}/network{pkl_name}_seed{seed:04d}-t-{truncation_psi}.gif', imgs_gif)
+    print(f'Saved at {network_folder} as network{pkl_name}_seed{seed:04d}-t-{truncation_psi}.gif')
     print("Exiting..")
     
 if __name__ == "__main__":
