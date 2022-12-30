@@ -76,9 +76,10 @@ device = torch.device('cuda')
 with dnnlib.util.open_url(network_pkl) as f:
     G = legacy.load_network_pkl(f)['G_ema'].to(device)
 
+z = torch.from_numpy(np.random.RandomState(seed).randn(1, G.z_dim)).to(device)
+
 fov_deg = 18.837
 intrinsics = FOV_to_intrinsics(fov_deg, device=device)
-
 cam_pivot = torch.tensor(G.rendering_kwargs.get('avg_camera_pivot', [0,0,0]), device=device)
 cam_radius = G.rendering_kwargs.get('avg_camera_radius', 2.7)
 cam2world_pose = LookAtPoseSampler.sample(np.pi/2 + angle_y, np.pi/2 + angle_p, cam_pivot, radius=cam_radius, device=device)
