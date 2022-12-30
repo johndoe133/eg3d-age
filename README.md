@@ -4,14 +4,26 @@
 
 ## Conditioning [EG3D](https://github.com/NVlabs/eg3d) on age
 
-![Image](./eg3d/example.gif)
+<p align="center">
+      <img src="./eg3d/42_l.gif" align="left" width="33%">
+      <img src="./eg3d/42_m.gif" align="middle" width="33%">
+      <img src="./eg3d/42_r.gif" align="right" width="33%">
+</p>
+
+<p align="center">
+      <img src="./eg3d/300_l.gif" align="left" width="33%">
+      <img src="./eg3d/300_m.gif" align="middle" width="33%">
+      <img src="./eg3d/300_r.gif" align="right" width="33%">
+</p>
+
+
 
 ### Abstract
 
 It is a complicated endeavor to change an individual's facial appearance such that their face image would be an accurate estimate of the individual's likeness up to decades in the future or past. To achieve that, one needs to create a realistic, high-quality face image of the correct age while also maintaining the person's identity, all from one image. Accomplishing this is made even more difficult by aging being a highly individual process, which varies greatly based on lifestyle and genetics. Current works are limited to creating face images from the original viewing angle, which is not ideal. This work aims to use the recent advances in generative adversarial networks (GANs) and their application both in face aging and generating 3D images from single 2D input images to address all these problems. This is accomplished by extending the existing EG3D network, one of the most advanced state-of-the-art works on 3D GANs, and appending the age condition to the input and augmenting the loss with identity preservation loss. The end product is **age-EG3D**, which can create wholly synthetic photorealistic face images with a custom _target age_ and _viewing angle_ while maintaining the identity of the subject. Age-EG3D achieves an impressive mean absolute error (MAE) of 4.1 years for synthetic images. It also enables age simulation on real face images with an MAE of 7.9.
 
 
-![Image](./eg3d/example.png)
+
 
 ## Installation
 In order to replicated age-EG3D, first clone the repository and change the directory
