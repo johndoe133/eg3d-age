@@ -8,12 +8,12 @@ from training.estimate_age import AgeEstimatorNew
 import torch
 from tqdm import tqdm
 
-root = r"/work3/morbj/datasets/FFHQ_512_6"
-path = os.path.join(root, "dataset_normalized.json")
+root = r"/work3/s174379/datasets/FFHQ_all"
+path = os.path.join(root, "dataset.json")
 
 
 
-age_model = AgeEstimatorNew(torch.device('cuda:1'))
+age_model = AgeEstimatorNew(torch.device('cuda:0'), age_max=75)
 
 def normalize(x, rmin = 0, rmax = 100, tmin = -1, tmax = 1):
     z = ((x - rmin) / (rmax - rmin)) * (tmax - tmin) + tmin
@@ -60,6 +60,6 @@ with open(path) as json_file:
 # plt.ylabel("Counts")
 # plt.title("Age distribution of data set")
 # plt.savefig("age_distribution.png")
-with open(os.path.join(root, "dataset_ages.json"), "w") as write_file:
+with open(os.path.join(root, "dataset_ages_2.json"), "w") as write_file:
     json.dump(data_copy, write_file)
 
