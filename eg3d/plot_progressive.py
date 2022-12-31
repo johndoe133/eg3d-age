@@ -20,32 +20,23 @@ import imageio
 import json
 
 @click.command()
-@click.option('--network_folder', help='Network folder name', required=True)
+@click.option('--network_folder', help='Path to the training folder of the network', required=False, default='')
 @click.option('--network', help='Path to specific network', default=None, required=False)
 @click.option('--seed', type=int, help='Random seed (e.g. 42)', required=True)
 @click.option('--trunc', 'truncation_psi', type=float, help='Truncation psi', default=1, show_default=True)
 @click.option('--trunc-cutoff', 'truncation_cutoff', type=int, help='Truncation cutoff', default=14, show_default=True)
-@click.option('--class', 'class_idx', type=int, help='Class label (unconditional if not specified)')
-@click.option('--shapes', help='Export shapes as .mrc files viewable in ChimeraX', type=bool, required=False, metavar='BOOL', default=False, show_default=True)
-@click.option('--shape-res', help='', type=int, required=False, metavar='int', default=512, show_default=True)
 @click.option('--fov-deg', help='Field of View of camera in degrees', type=int, required=False, metavar='float', default=18.837, show_default=True)
-@click.option('--shape-format', help='Shape Format', type=click.Choice(['.mrc', '.ply']), default='.mrc')
-@click.option('--reload_modules', help='Overload persistent modules?', type=bool, required=False, metavar='BOOL', default=False, show_default=True)
 @click.option('--img_h', help='image height', type=int, required=False,default=512, show_default=True)
+@click.option('--calibrated', help="whether to use a calibrated target age. Use calibrate_network.py to compute function.", required=False, default=False)
 def generate_images(
     network_folder: str,
     network: str,
     seed: int,
     truncation_psi: float,
     truncation_cutoff: int,
-    shapes: bool,
-    shape_res: int,
     fov_deg: float,
-    shape_format: str,
-    class_idx: Optional[int],
-    reload_modules: bool,
     img_h: int,
-
+    calibrated: bool
 ):
     print(f'Loading networks from "{network_folder}"...')
     device = torch.device('cuda')
@@ -61,14 +52,18 @@ def generate_images(
     
     print("Loading network from path:", network_path)
     network_pkl = network_path
-
+    cal = lambda age: age
+    if calibrated:
+        cal_path = os.path.join('/'.join(network_path.split("/")[:-1]), f"calibrate-{truncation_psi}.npy")
+        a,b = np.load(cal_path)
+        cal = lambda age: (age-b)/a
     outdir = network_folder
     with dnnlib.util.open_url(network_pkl) as f:
         G = legacy.load_network_pkl(f)['G_ema'].to(device)
     
     z = torch.from_numpy(np.random.RandomState(seed).randn(1, G.z_dim)).to(device)
 
-    def normalize(x, rmin = 20, rmax = 100, tmin = -1, tmax = 1):
+    def normalize(x, rmin = 0, rmax = 75, tmin = -1, tmax = 1):
         # normalize age between -1 and 1
         z = ((x - rmin) / (rmax - rmin)) * (tmax - tmin) + tmin
         return z
@@ -110,7 +105,7 @@ def generate_images(
                 age_list = [0] *101
                 age_list[int(age)] = 1
             else:
-                age_list = [normalize(age, rmin=age_min, rmax=age_max)]
+                age_list = [normalize(cal(age), rmin=age_min, rmax=age_max)]
             c = torch.cat((conditioning_params, torch.tensor([age_list], device=device)), 1)
             c_params = torch.cat((camera_params, torch.tensor([age_list], device=device)), 1)
             ws = G.mapping(z, c.float(), truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff)
@@ -134,14 +129,18 @@ def generate_images(
     for i, age in enumerate(ages):
         draw.text(((i*512)+230,0), f"Age: {int(age)}", (0,0,0), font=font)
 
-    pil_img.save(f'{network_folder}/network{pkl_name}_seed{seed:04d}.png')
-    print(f'Saved at {outdir}/network{pkl_name}_seed{seed:04d}.png')
+    if calibrated:
+        pil_img.save(f'{network_folder}/network{pkl_name}_seed{seed:04d}-t-{truncation_psi}-cal.png')
+        print(f'Saved at {network_folder}/network{pkl_name}_seed{seed:04d}-t-{truncation_psi}-cal.png')
+    else:
+        pil_img.save(f'{network_folder}/network{pkl_name}_seed{seed:04d}-t-{truncation_psi}.png')
+        print(f'Saved at {network_folder}/network{pkl_name}_seed{seed:04d}-t-{truncation_psi}.png')
 
     ######## GIF #########
     font = ImageFont.truetype("FreeSerif.ttf", 40)
 
     print("Creating .gif file...")
-    ages = np.linspace(-1,1,age_max - age_min) #one for each age
+    ages = np.linspace(0,75, 76) #one for each age
     imgs_gif = []
     
     angle_y, angle_p = (0, 0)
@@ -154,7 +153,7 @@ def generate_images(
 
     for age in ages:
         if age_loss_fn == "MSE":
-            age_list = [age]
+            age_list = [normalize(cal(age), rmin=age_min, rmax=age_max)]
         elif age_loss_fn == "CAT":
             age_list = [0] * 101
             age_list[int(age)] = 1
@@ -168,14 +167,14 @@ def generate_images(
         img = (img.permute(0, 2, 3, 1) * 127.5 + 128).clamp(0, 255).to(torch.uint8)
         pil_img = Image.fromarray(img[0,:,:,:].cpu().numpy().astype('uint8')) # to draw on
         text_added = ImageDraw.Draw(pil_img)
-        text_color="#A0240A"
-        text_added.text((0,450), f"Age: {int(denormalize(age, rmin=age_min, rmax=age_max))}", font=font, fill=text_color) #SKAL BRUGE AGE_MIN AGE_MAX
+        text_color="#FFFFFF"
+        text_added.text((0,450), f"Age: {int(age)}", font=font, fill=text_color) #SKAL BRUGE AGE_MIN AGE_MAX
         imgs_gif.append(np.array(pil_img))
 
     # imgs_gif = [tensor.cpu().numpy()[0,:,:,:] for tensor in imgs_gif]
     print("Saving gif..")
-    imageio.mimsave(f'{network_folder}/network{pkl_name}_seed{seed:04d}.gif', imgs_gif)
-    print(f'Saved at {network_folder} as network{pkl_name}_seed{seed:04d}.gif')
+    imageio.mimsave(f'{network_folder}/network{pkl_name}_seed{seed:04d}-t-{truncation_psi}.gif', imgs_gif)
+    print(f'Saved at {network_folder} as network{pkl_name}_seed{seed:04d}-t-{truncation_psi}.gif')
     print("Exiting..")
     
 if __name__ == "__main__":

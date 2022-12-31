@@ -29,16 +29,16 @@ def get_concat_h(im1, im2):
     dst.paste(im2, (im1.width, 0))
     return dst
 
-def visualize(image_name, c):
+def visualize(image_name, c, trunc):
     old_G, new_G = load_generators(image_name)
 
-    embedding_dir_w = './PTI/embeddings/w'
+    embedding_dir_w = '/work3/morbj/embeddings/w'
     z_pivot = torch.load(f'{embedding_dir_w}/{image_name}.pt')
 
-    w_pivot_old = old_G.mapping(z_pivot, c)
+    w_pivot_old = old_G.mapping(z_pivot, c, truncation_psi=trunc)
     old_image = old_G.synthesis(w_pivot_old, c)['image']
 
-    w_pivot = new_G.mapping(z_pivot, c)
+    w_pivot = new_G.mapping(z_pivot, c, truncation_psi=trunc)
     new_image = new_G.synthesis(w_pivot, c)['image'] #, noise_mode='const', force_fp32 = True
 
     images = [old_image, new_image]

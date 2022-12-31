@@ -22,6 +22,7 @@ def normalize(x, rmin = 5, rmax = 80, tmin = -1, tmax = 1):
 @click.option('--w_iterations', help="How many iterations the program does to find w inversion", required=False, default=500, type=int)
 @click.option('--pti_iterations', help="PTI inversion iterations", required=False, default=350, type=int)
 @click.option('--run_pti_inversion', help="Whether to run the inversion", required=False, default=True, type=bool)
+@click.option('--trunc', help="", required=False, default=1.0, type=float)
 def pti_pipeline(
     age: Optional[int],
     image_name: str,
@@ -30,6 +31,8 @@ def pti_pipeline(
     w_iterations: int,
     pti_iterations: int,
     run_pti_inversion: bool,
+    trunc: float,
+
 ):
     start_time = time.time()
     hyperparameters.first_inv_steps = w_iterations
@@ -41,14 +44,14 @@ def pti_pipeline(
     if preprocess:
         pre_process_images()
 
-    c = run(model_path, image_name, run_pti_inversion, age)
+    c = run(model_path, image_name, run_pti_inversion, age, trunc)
 
     end_time = time.time()
     print(f"Optimization run time: {int(end_time - start_time)} seconds")
     print("Saving images...")
-    visualize(image_name, c)
+    visualize(image_name, c, trunc)
     print(f"See output in folder eg3d/PTI/output/{image_name}")
 
-    edit_age(image_name, model_path, c)
+    edit_age(image_name, model_path, c, trunc)
 if __name__ == "__main__":
     pti_pipeline()

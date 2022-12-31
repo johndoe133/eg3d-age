@@ -29,7 +29,7 @@ def main(
         model_path: str,
         trunc: float,
     ):
-    save_name = f"{model_path.split('/')[-2][:5]}-{model_path.split('/')[-1].split('.')[0][8:]}-trunc-{trunc}"
+    save_name = f"{model_path.split('/')[-3]}-{model_path.split('/')[-1].split('.')[0][8:]}-trunc-{trunc}"
     
     paths_config.checkpoints_dir = f'/work3/morbj/embeddings/{save_name}'
     device = torch.device('cuda')
@@ -43,6 +43,8 @@ def main(
     pbar = tqdm(os.listdir(image_folder))
     for image_name in pbar:
         embeddings_G = os.path.join(paths_config.checkpoints_dir, "G")     
+        os.makedirs(embeddings_G, exist_ok=True)
+        os.makedirs(os.path.join(paths_config.checkpoints_dir, "w") , exist_ok=True)
         if image_name.replace("png", "pt") in os.listdir(embeddings_G):
             continue #image already inverted
         pbar.set_description(f"Processing {image_name}")
@@ -67,14 +69,14 @@ def main(
         
         run_PTI(c, image_name, use_wandb=False, use_multi_id_training=False, evaluation=True, trunc=trunc)
 
-    # Generate image of ages [0,10,20,30,...,100]
-    ages = np.arange(0,110,10)
+    # Generate image of ages [0,5,10,...,100]
+    ages = np.arange(0,105,5)
+    folder_name = os.path.join(paths_config.checkpoints_dir, "images")
+    os.makedirs(folder_name, exist_ok=True)
+    cal = lambda age: (age-23.4) / 0.349
     for image_name in tqdm(os.listdir(image_folder)):
         image_name = image_name.strip('.png')
-        # create folder
         pbar.set_description(f"Saving images for {image_name}")
-        folder_name = os.path.join(paths_config.checkpoints_dir, image_name)
-        os.makedirs(folder_name, exist_ok=True)
 
         # load PTI G and z pivot
         new_G, z_pivot= load_generator(image_name)
@@ -92,12 +94,13 @@ def main(
         # generate images of different ages
         for age in ages:
             new_c = c
-            new_c[0][-1] = normalize(age, rmin=hyperparameters.age_min, rmax=hyperparameters.age_max)
+            new_c[0][-1] = normalize(cal(age), rmin=hyperparameters.age_min, rmax=hyperparameters.age_max)
             w_pivot = new_G.mapping(z_pivot, c, truncation_psi = trunc)
             new_image = new_G.synthesis(w_pivot, new_c)['image']
             img = (new_image.permute(0, 2, 3, 1) * 127.5 + 128).clamp(0, 255).to(torch.uint8)[0].cpu().numpy()
             img = Image.fromarray(img)
-            img.save(f"{folder_name}/{age}.png")
+            save = os.path.join(folder_name, f"_{image_name}_{age}.png")
+            img.save(save)
 
 def normalize(x, rmin = 0, rmax = 75, tmin = -1, tmax = 1):
     """Defined in eg3d.training.training_loop

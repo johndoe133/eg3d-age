@@ -37,7 +37,7 @@ def denormalize(z, rmin = 0, rmax = 75, tmin = -1, tmax = 1):
     x = (z*(rmax - rmin)- tmin*(rmax-rmin))/(tmax-tmin)+rmin
     return x
 
-def run(model_path, image_name, run_pti_inversion, age):
+def run(model_path, image_name, run_pti_inversion, age, trunc):
     #Load models
     print(f"Inverting {image_name}...")
     paths_config.stylegan2_ada_ffhq = model_path
@@ -69,9 +69,10 @@ def run(model_path, image_name, run_pti_inversion, age):
     c = np.reshape(c, (1, 26))
     c = torch.FloatTensor(c).cuda()
     
+    age=0
     if run_pti_inversion:
         print("Running PTI optimization...")
-        model_id, age= run_PTI(c, image_name, use_wandb=False, use_multi_id_training=False)
+        model_id, age= run_PTI(c, image_name, use_wandb=False, use_multi_id_training=False, trunc=trunc)
         print("Finished running PTI optimization")
     c[:,-1] = age
     return c

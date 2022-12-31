@@ -10,7 +10,7 @@ dlib = f'{home}/Documents/eg3d-age/eg3d/networks/align.dat'
 
 ## Dirs for output files
 checkpoints_dir = f'{home}/Documents/eg3d-age/eg3d/PTI/checkpoints'
-embedding_base_dir = f'{home}/Documents/eg3d-age/eg3d/PTI/embeddings'
+embedding_base_dir = '/work3/morbj/embeddings' #f'{home}/Documents/eg3d-age/eg3d/PTI/embeddings'
 styleclip_output_dir = './StyleCLIP_results'
 experiments_output_dir = f'{home}/Documents/eg3d-age/eg3d/PTI/output'
 

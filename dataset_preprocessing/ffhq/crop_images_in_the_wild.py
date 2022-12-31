@@ -36,6 +36,10 @@ if __name__ == '__main__':
         os.makedirs(out_dir, exist_ok=True)
         
     for img_file, lm_file in zip(img_files, lm_files):
+        out_path = os.path.join(out_dir, img_file.split(".")[0] + ".png")
+        if os.path.isfile(out_path):
+            print("Skipped")
+            continue
 
         img_path = os.path.join(args.indir, img_file)
         lm_path = os.path.join(lm_dir, lm_file)
@@ -58,7 +62,6 @@ if __name__ == '__main__':
         lower = upper + center_crop_size
         im_cropped = im_high.crop((left, upper, right,lower))
         im_cropped = im_cropped.resize((output_size, output_size), resample=Image.LANCZOS)
-        out_path = os.path.join(out_dir, img_file.split(".")[0] + ".png")
         im_cropped.save(out_path)
 
 

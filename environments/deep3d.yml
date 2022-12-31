@@ -135,6 +135,7 @@ dependencies:
     - markdown==3.3.7
     - matplotlib==2.2.5
     - mtcnn==0.1.1
+    - nvdiffrast==0.3.0
     - opencv-python==4.6.0.66
     - protobuf==3.19.5
     - tensorboard==1.15.0
